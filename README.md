@@ -31,6 +31,8 @@ Use a dedicated test database. The PostgreSQL integration test creates a tempora
 
 ## Deploy
 
+The production service is defined in `.railway/railway.ts`. After linking the Railway CLI to the existing project, run `npm ci` at the repository root and `railway config plan --environment production` to review configuration changes. Apply the reviewed configuration with `railway config apply --environment production`. GitHub pushes to `master` deploy application code.
+
 Railway builds the Go binary and frontend together from the Dockerfile. Its pre-deploy step runs `/app/server migrate`. The server checks the schema at startup. The `/healthz` route checks the running process without waking the database on each probe.
 
 | Setting | Purpose |

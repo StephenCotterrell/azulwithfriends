@@ -1,0 +1,8 @@
+{
+  "name": "azulwithfriends-infrastructure",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "railway": "3.16.0"
+  }
+}
