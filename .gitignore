@@ -3,7 +3,8 @@
 !.env.example
 .aws/
 .neon
-.railway
+.railway/*
+!.railway/railway.ts
 node_modules/
 dist/
 .vite/
