@@ -46,17 +46,28 @@ func New(db *pgxpool.Pool, dist string, secureCookies bool) http.Handler {
 	})
 	mux.HandleFunc("POST /api/session", a.saveSession)
 	mux.HandleFunc("GET /api/me", a.me)
+	mux.HandleFunc("POST /api/rooms", a.saveRoom)
+	mux.HandleFunc("GET /api/rooms/{id}", a.getRoom)
+	mux.HandleFunc("POST /api/rooms/{id}/join", a.saveRoom)
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusNotFound, "Unknown API endpoint.")
 	})
-	mux.Handle("GET /", staticFiles(http.Dir(dist)))
+	files := staticFiles(http.Dir(dist))
+	mux.Handle("GET /r/{id}", files)
+	mux.Handle("GET /r/{id}/{$}", files)
+	mux.Handle("GET /", files)
 	return mux
 }
 
 func staticFiles(dir http.Dir) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.URL.Path
-		if name == "/" {
+		isInvitation := r.PathValue("id") != ""
+		if isInvitation {
+			w.Header().Set("Referrer-Policy", "no-referrer")
+			w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+		}
+		if name == "/" || isInvitation {
 			name = "/index.html"
 		}
 		file, err := dir.Open(name)
@@ -133,23 +144,30 @@ func (a *app) me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, playerResponse{&player})
 }
 
-func (a *app) saveSession(w http.ResponseWriter, r *http.Request) {
+func (a *app) readJSON(w http.ResponseWriter, r *http.Request, input any) bool {
 	if err := a.origins.Check(r); err != nil {
-		problem(w, http.StatusForbidden, "Please save your name from this site.")
-		return
+		problem(w, http.StatusForbidden, "Please make this request from the game site.")
+		return false
 	}
 	contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || contentType != "application/json" {
 		problem(w, http.StatusUnsupportedMediaType, "Send a JSON request.")
-		return
-	}
-	var input struct {
-		DisplayName string `json:"displayName"`
+		return false
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil || decoder.Decode(new(any)) != io.EOF {
-		problem(w, http.StatusBadRequest, "Send one JSON object with a display name.")
+	if err := decoder.Decode(input); err != nil || decoder.Decode(new(any)) != io.EOF {
+		problem(w, http.StatusBadRequest, "Send one JSON object with the expected fields.")
+		return false
+	}
+	return true
+}
+
+func (a *app) saveSession(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		DisplayName string `json:"displayName"`
+	}
+	if !a.readJSON(w, r, &input) {
 		return
 	}
 	name := strings.TrimSpace(input.DisplayName)
@@ -175,21 +193,26 @@ func (a *app) saveSession(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusTooManyRequests, "Too many guests are joining. Try again in a minute.")
 		return
 	}
-	token := make([]byte, 32)
-	rand.Read(token)
-	hash := sha256.Sum256(token)
-	expires := time.Now().Add(sessionLifetime).UTC()
-	player, err := database.CreatePlayer(ctx, a.db, hash[:], name, expires)
+	cookie, hash := a.newGuestCookie()
+	player, err := database.CreatePlayer(ctx, a.db, hash, name, cookie.Expires)
 	if err != nil {
 		databaseError(w, err)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, cookie)
+	writeJSON(w, http.StatusCreated, playerResponse{&player})
+}
+
+func (a *app) newGuestCookie() (*http.Cookie, []byte) {
+	token := make([]byte, 32)
+	rand.Read(token)
+	hash := sha256.Sum256(token)
+	cookie := &http.Cookie{
 		Name: a.cookieName, Value: base64.RawURLEncoding.EncodeToString(token), Path: "/",
 		HttpOnly: true, Secure: a.secureCookies, SameSite: http.SameSiteLaxMode,
-		MaxAge: int(sessionLifetime.Seconds()), Expires: expires,
-	})
-	writeJSON(w, http.StatusCreated, playerResponse{&player})
+		MaxAge: int(sessionLifetime.Seconds()), Expires: time.Now().Add(sessionLifetime).UTC(),
+	}
+	return cookie, hash[:]
 }
 
 // Bound anonymous writes on the single public instance without trusting forwarded IPs.

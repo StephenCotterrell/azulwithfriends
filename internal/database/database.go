@@ -13,6 +13,9 @@ import (
 //go:embed migrations/001_guest_sessions.sql
 var guestSessionMigration string
 
+//go:embed migrations/002_rooms.sql
+var roomMigration string
+
 func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(url)
 	if err != nil {
@@ -43,15 +46,24 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	)`); err != nil {
 		return err
 	}
-	var applied bool
-	if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 1)").Scan(&applied); err != nil {
-		return err
-	}
-	if !applied {
-		if _, err := tx.Exec(ctx, guestSessionMigration, pgx.QueryExecModeSimpleProtocol); err != nil {
+	for _, migration := range []struct {
+		version int
+		sql     string
+	}{
+		{1, guestSessionMigration},
+		{2, roomMigration},
+	} {
+		var applied bool
+		if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)", migration.version).Scan(&applied); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES (1)"); err != nil {
+		if applied {
+			continue
+		}
+		if _, err := tx.Exec(ctx, migration.sql, pgx.QueryExecModeSimpleProtocol); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES ($1)", migration.version); err != nil {
 			return err
 		}
 	}
@@ -60,8 +72,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 
 func CheckSchema(ctx context.Context, pool *pgxpool.Pool) error {
 	_, err := pool.Exec(ctx, `
-		SELECT p.id, p.display_name, s.token_hash, s.expires_at
+		SELECT p.id, p.display_name, s.token_hash, s.expires_at, r.id, seat.number
 		FROM players p JOIN sessions s ON s.player_id = p.id
+		JOIN room_seats seat ON seat.player_id = p.id JOIN rooms r ON r.id = seat.room_id
 		LIMIT 0`)
 	return err
 }
@@ -71,9 +84,14 @@ type Player struct {
 	DisplayName string `json:"displayName"`
 }
 
-func FindPlayer(ctx context.Context, pool *pgxpool.Pool, hash []byte) (Player, error) {
+// Both the standalone guest flow and the room transaction share these queries.
+type rowQuerier interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func FindPlayer(ctx context.Context, db rowQuerier, hash []byte) (Player, error) {
 	var player Player
-	err := pool.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT p.id::text, p.display_name
 		FROM sessions s JOIN players p ON p.id = s.player_id
 		WHERE s.token_hash = $1 AND s.expires_at > now()`, hash).Scan(&player.ID, &player.DisplayName)
@@ -90,10 +108,10 @@ func RenamePlayer(ctx context.Context, pool *pgxpool.Pool, hash []byte, name str
 	return player, err
 }
 
-func CreatePlayer(ctx context.Context, pool *pgxpool.Pool, hash []byte, name string, expires time.Time) (Player, error) {
+func CreatePlayer(ctx context.Context, db rowQuerier, hash []byte, name string, expires time.Time) (Player, error) {
 	player := Player{DisplayName: name}
 	// Both inserts commit atomically, in one round trip to the database.
-	err := pool.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		WITH new_player AS (
 			INSERT INTO players(display_name) VALUES ($1) RETURNING id
 		)

@@ -1,53 +1,52 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { postJSON, requestJSON } from "./api";
 
-type Player = { id: string; displayName: string };
-type View =
-  | { kind: "loading" }
-  | { kind: "unavailable" }
-  | { kind: "form"; previous: Player | null }
-  | { kind: "saved"; player: Player };
+type Session = { player: { displayName: string } | null };
 
-async function requestSession(path: string, options?: RequestInit): Promise<Player | null> {
-  const response = await fetch(path, {
-    cache: "no-store",
-    ...options,
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(typeof data.error === "string" ? data.error : "Please try again.");
-  }
-  if (data.player === null) return null;
-  if (typeof data.player?.id !== "string" || typeof data.player?.displayName !== "string") {
-    throw new Error("The server returned an unexpected response.");
-  }
-  return data.player;
-}
+type Props = {
+  disabled?: boolean;
+  onSaved?: () => void;
+  onSaving?: (saving: boolean) => void;
+};
 
-export function GuestPanel() {
-  const [view, setView] = useState<View>({ kind: "loading" });
-  const [attempt, setAttempt] = useState(0);
+export function GuestPanel({ disabled, onSaved, onSaving }: Props) {
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const field = useRef<HTMLInputElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    if (!open) return;
     const controller = new AbortController();
-    requestSession("/api/me", { signal: controller.signal })
-      .then((player) => {
-        if (!controller.signal.aborted) {
-          setView(player ? { kind: "saved", player } : { kind: "form", previous: null });
-        }
+    requestJSON<Session>("/api/me", { signal: controller.signal })
+      .then(({ player }) => {
+        if (!controller.signal.aborted) setName(player?.displayName ?? "");
       })
       .catch(() => {
-        if (!controller.signal.aborted) setView({ kind: "unavailable" });
+        if (!controller.signal.aborted) setError("Couldn’t load your current name. You can still save a new one.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [attempt]);
+  }, [open]);
+
+  useEffect(() => {
+    if (open && !loading) field.current?.focus();
+  }, [open, loading]);
+
+  function close() {
+    setOpen(false);
+    requestAnimationFrame(() => toggle.current?.focus());
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    if (loading || saving) return;
     const displayName = name.trim();
     if (!displayName || Array.from(displayName).length > 24 || /\p{Cc}/u.test(displayName)) {
       setError("Use a name with 1 to 24 visible characters.");
@@ -56,71 +55,44 @@ export function GuestPanel() {
     }
     setError("");
     setSaving(true);
+    onSaving?.(true);
     try {
-      const player = await requestSession("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName }),
-      });
-      if (!player) throw new Error("Your guest name could not be saved.");
-      setView({ kind: "saved", player });
+      await postJSON<Session>("/api/session", { displayName });
+      setSaved(true);
+      onSaved?.();
+      close();
     } catch (cause) {
-      setError(cause instanceof Error && !(cause instanceof TypeError || cause instanceof SyntaxError)
-        ? cause.message
-        : "We couldn’t save your name. Check your connection and try again.");
+      setError(cause instanceof Error ? cause.message : "Your name couldn’t be saved. Try again.");
     } finally {
       setSaving(false);
+      onSaving?.(false);
     }
   }
 
-  if (view.kind === "loading") {
-    return <section className="guest-panel" aria-label="Guest session"><p role="status">Checking your guest session…</p></section>;
-  }
-  if (view.kind === "unavailable") {
-    return (
-      <section className="guest-panel" aria-label="Guest session">
-        <p role="alert">We couldn’t check your guest session.</p>
-        <button type="button" onClick={() => {
-          setView({ kind: "loading" });
-          setAttempt(attempt + 1);
-        }}>Try again</button>
-      </section>
-    );
-  }
-  if (view.kind === "saved") {
-    return (
-      <section className="guest-panel" aria-label="Your guest name">
-        <p className="intro">This browser will remember your guest name.</p>
-        <div className="guest-saved" role="status">
-          <span className="check" aria-hidden="true">✓</span>
-          <div><span className="field-label">Guest name</span><strong>{view.player.displayName}</strong></div>
-        </div>
-        <button className="secondary" type="button" onClick={() => {
-          setName(view.player.displayName);
-          setError("");
-          setView({ kind: "form", previous: view.player });
-        }}>Edit name</button>
-      </section>
-    );
-  }
   return (
-    <form className="guest-panel" onSubmit={save} noValidate>
-      <p className="intro">Choose the name you’ll use at the table.</p>
-      <label className="field-label" htmlFor="guest-name">Display name</label>
-      <input id="guest-name" name="displayName" type="text" ref={field}
-        value={name} onChange={(event) => { setName(event.target.value); setError(""); }}
-        autoFocus={view.previous !== null} autoComplete="nickname" placeholder="Your name"
-        aria-describedby={error ? "name-error" : "name-hint"} aria-invalid={error ? true : undefined}
-        disabled={saving} />
-      {error
-        ? <p id="name-error" className="error" role="alert">{error}</p>
-        : <p id="name-hint" className="hint">Saved for this browser.</p>}
-      <div className="actions">
-        <button type="submit" disabled={saving}>{saving ? "Saving…" : "Save guest name"}</button>
-        {view.previous && <button className="secondary" type="button" disabled={saving} onClick={() => {
-          if (view.previous) setView({ kind: "saved", player: view.previous });
-        }}>Cancel</button>}
-      </div>
-    </form>
+    <div className="name-editor">
+      <button type="button" className="text-button" ref={toggle} disabled={disabled || saving}
+        aria-expanded={open} aria-controls={open ? "name-form" : undefined} onClick={() => {
+          if (open) { close(); return; }
+          setSaved(false);
+          setLoading(true);
+          setError("");
+          setName("");
+          setOpen(true);
+        }}>Display name</button>
+      {!open && saved && <span className="name-notice hint" role="status">Name saved.</span>}
+      {open && <form id="name-form" onSubmit={save} noValidate>
+        <label className="field-label" htmlFor="guest-name">Your display name</label>
+        <input id="guest-name" name="displayName" type="text" ref={field} value={name}
+          onChange={(event) => { setName(event.target.value); setError(""); }}
+          autoComplete="nickname" aria-describedby={error ? "name-hint name-error" : "name-hint"} disabled={disabled || loading || saving} />
+        <p id="name-hint" className="hint">Optional. This name follows you between rooms in this browser.</p>
+        {error && <p id="name-error" className="error" role="alert">{error}</p>}
+        <div className="actions">
+          <button type="submit" disabled={disabled || loading || saving}>{saving ? "Saving…" : "Save name"}</button>
+          <button type="button" className="secondary" disabled={saving} onClick={close}>Cancel</button>
+        </div>
+      </form>}
+    </div>
   );
 }

@@ -2,75 +2,52 @@ package httpapp
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/StephenCotterrell/azulwithfriends/internal/database"
-	"github.com/jackc/pgx/v5"
+	"github.com/StephenCotterrell/azulwithfriends/internal/database/dbtest"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TestGuestPersistsAcrossRestart(t *testing.T) {
-	adminURL := os.Getenv("TEST_DATABASE_URL")
-	if adminURL == "" {
-		t.Skip("set TEST_DATABASE_URL to run the PostgreSQL integration test")
-	}
+func openTestDB(t *testing.T, dsn string) *pgxpool.Pool {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
-	open := func(dsn string) *pgxpool.Pool {
-		t.Helper()
-		pool, err := database.Open(ctx, dsn)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return pool
-	}
-	admin := open(adminURL)
-	defer admin.Close()
-	var suffix [8]byte
-	rand.Read(suffix[:])
-	schema := "guest_test_" + hex.EncodeToString(suffix[:])
-	identifier := pgx.Identifier{schema}.Sanitize()
-	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+identifier); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if _, err := admin.Exec(ctx, "DROP SCHEMA "+identifier+" CASCADE"); err != nil {
-			t.Error(err)
-		}
-	}()
-	dsn, err := url.Parse(adminURL)
+	pool, err := database.Open(ctx, dsn)
 	if err != nil {
-		t.Fatal("TEST_DATABASE_URL must be a PostgreSQL URL")
-	}
-	params := dsn.Query()
-	params.Set("search_path", schema)
-	dsn.RawQuery = params.Encode()
-	first := open(dsn.String())
-	defer first.Close()
-	if err := database.Migrate(ctx, first); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(pool.Close)
+	if err := database.Migrate(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
+	return pool
+}
+
+func sendRequest(handler http.Handler, method, endpoint, body string, cookie *http.Cookie) *httptest.ResponseRecorder {
+	r := httptest.NewRequest(method, "https://game.example"+endpoint, strings.NewReader(body))
+	if body != "" {
+		r.Header.Set("Content-Type", "application/json")
+	}
+	if cookie != nil {
+		r.AddCookie(cookie)
+	}
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, r)
+	return recorder
+}
+
+func TestGuestPersistsAcrossRestart(t *testing.T) {
+	dsn := dbtest.IsolatedDSN(t)
+	first := openTestDB(t, dsn)
 	handler := New(first, t.TempDir(), true)
 	send := func(method, endpoint, body string, cookie *http.Cookie) *httptest.ResponseRecorder {
-		r := httptest.NewRequest(method, "https://game.example"+endpoint, strings.NewReader(body))
-		if body != "" {
-			r.Header.Set("Content-Type", "application/json")
-		}
-		if cookie != nil {
-			r.AddCookie(cookie)
-		}
-		recorder := httptest.NewRecorder()
-		handler.ServeHTTP(recorder, r)
-		return recorder
+		return sendRequest(handler, method, endpoint, body, cookie)
 	}
 	created := send(http.MethodPost, "/api/session", `{"displayName":"  Robin  "}`, nil)
 	if created.Code != http.StatusCreated {
@@ -86,11 +63,7 @@ func TestGuestPersistsAcrossRestart(t *testing.T) {
 	}
 
 	first.Close()
-	second := open(dsn.String())
-	defer second.Close()
-	if err := database.Migrate(ctx, second); err != nil {
-		t.Fatalf("repeat deployment failed: %v", err)
-	}
+	second := openTestDB(t, dsn)
 	handler = New(second, t.TempDir(), true)
 	restored := send(http.MethodGet, "/api/me", "", cookies[0])
 	if restored.Code != http.StatusOK || restored.Body.String() != created.Body.String() {
@@ -101,7 +74,7 @@ func TestGuestPersistsAcrossRestart(t *testing.T) {
 	if err := json.Unmarshal(renamed.Body.Bytes(), &updated); err != nil || renamed.Code != http.StatusOK || updated.Player == nil || updated.Player.ID != guest.Player.ID || updated.Player.DisplayName != "Jay" {
 		t.Fatalf("rename failed to preserve identity: %d %s", renamed.Code, renamed.Body)
 	}
-	if _, err := second.Exec(ctx, "UPDATE sessions SET expires_at = now() - interval '1 minute'"); err != nil {
+	if _, err := second.Exec(t.Context(), "UPDATE sessions SET expires_at = now() - interval '1 minute'"); err != nil {
 		t.Fatal(err)
 	}
 	expired := send(http.MethodGet, "/api/me", "", cookies[0])

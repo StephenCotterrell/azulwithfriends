@@ -1,6 +1,8 @@
 # Azul with Friends
 
-A browser game built with Go, React, TypeScript and PostgreSQL. The first increment lets a guest choose a display name, return in the same browser and edit it. The game rules and multiplayer table are the next increments.
+A browser game in development with Go, React, TypeScript and PostgreSQL. Choose **Create a room** to take the first seat, then share the room URL with a friend. They can open it and choose **Join room** to take the second seat. Each player can use the default seat name or pick a display name.
+
+Rooms are unlisted. Anyone with the URL can view the seats and claim an open one. A private cookie remembers each player's seat in that browser for up to 30 days. Sharing the URL shares access to the room, while your seat stays with your browser. Tile drafting and scoring are the next milestone.
 
 ## Run locally
 
@@ -42,4 +44,4 @@ Railway builds the Go binary and frontend together from the Dockerfile. Its pre-
 | `PORT` | Listen port, default `8080` |
 | `WEB_DIST_DIR` | Compiled frontend directory, default `web/dist` |
 
-Store credentials in Railway service variables. Use the development Neon branch for remote development and the production branch for the deployed app. Keep production cookies secure. To verify deployment, save a guest name at the Railway URL, refresh, and return with the same browser after restarting the service.
+Store credentials in Railway service variables. Use the development Neon branch for remote development and the production branch for the deployed app. Keep production cookies secure. To check a release, create a room in one browser, open its invite in a private window and join. Refresh both windows and check that each returns to its own seat.
