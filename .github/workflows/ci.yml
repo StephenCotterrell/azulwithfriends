@@ -47,3 +47,6 @@ jobs:
           curl --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 http://127.0.0.1:8080/healthz
           curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8080/
           curl --fail --silent --show-error http://127.0.0.1:8080/api/me | jq -e 'has("player") and .player == null'
+          room_id=$(curl -fsS -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8080/api/rooms | jq -er 'select(.yourSeat == 1) | .id')
+          curl -fsS "http://127.0.0.1:8080/r/$room_id" | grep -F '<div id="root">'
+          curl -fsS "http://127.0.0.1:8080/api/rooms/$room_id" | jq -e '.yourSeat == 0 and (.seats | length) == 1'
