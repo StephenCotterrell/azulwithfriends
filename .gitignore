@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.aws/
+.neon
+.railway
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+/bin/
+/server
+/coverage.out

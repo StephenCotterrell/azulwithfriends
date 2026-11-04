@@ -1,0 +1,49 @@
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: azul_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d azul_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://postgres:test@127.0.0.1:5432/azul_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+      - name: Build the Go server and React application
+        run: docker build --tag azul-ci .
+      - name: Check the packaged application
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.TEST_DATABASE_URL }}
+        run: |
+          docker run --rm --network host --env DATABASE_URL_UNPOOLED azul-ci /app/server migrate
+          docker run --detach --name azul-smoke --network host --env DATABASE_URL azul-ci
+          trap 'docker logs azul-smoke; docker rm --force azul-smoke >/dev/null' EXIT
+          curl --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 http://127.0.0.1:8080/healthz
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8080/
+          curl --fail --silent --show-error http://127.0.0.1:8080/api/me | jq -e 'has("player") and .player == null'
