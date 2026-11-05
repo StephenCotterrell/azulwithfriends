@@ -119,6 +119,26 @@ func (a *app) setRoomListing(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, room)
 }
 
+func (a *app) setRoomBot(w http.ResponseWriter, r *http.Request) {
+	enabled, ok := a.readBoolOption(w, r, "enabled", true)
+	if !ok {
+		return
+	}
+	id := r.PathValue("id")
+	if !validRoomKey(id) {
+		roomError(w, pgx.ErrNoRows)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	room, err := database.SetRoomBot(ctx, a.db, id, a.sessionHash(r), enabled)
+	if err != nil {
+		roomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, room)
+}
+
 // Each route takes a single boolean. An omitted option on create/join keeps
 // the original link-only behavior. Reject explicit nulls and unrelated keys.
 func (a *app) readBoolOption(w http.ResponseWriter, r *http.Request, name string, required bool) (bool, bool) {
@@ -158,7 +178,7 @@ func roomError(w http.ResponseWriter, err error) {
 	case errors.Is(err, database.ErrNoSeat), errors.Is(err, database.ErrNotHost), errors.Is(err, database.ErrStartRequiresHost):
 		problem(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, database.ErrNotListed), errors.Is(err, database.ErrNeedPlayers), errors.Is(err, database.ErrNotStarted),
-		errors.Is(err, database.ErrStaleMove), errors.Is(err, database.ErrIllegalMove):
+		errors.Is(err, database.ErrStaleMove), errors.Is(err, database.ErrIllegalMove), errors.Is(err, database.ErrGameStarted):
 		problem(w, http.StatusConflict, err.Error())
 	default:
 		slog.Error("room database request failed", "error", err)

@@ -34,7 +34,7 @@ export type Room = {
   id: string;
   slug: string;
   listed: boolean;
-  seats: { number: number; displayName: string }[];
+  seats: { number: number; displayName: string; isBot: boolean }[];
   yourSeat: number;
   game: Game | null;
 };

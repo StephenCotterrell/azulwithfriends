@@ -75,7 +75,7 @@ function Welcome() {
               <label><input type="radio" name="visibility" checked={listed} onChange={() => setListed(true)} />Public lobby</label>
             </div>
           </fieldset>
-          <p className="hint visibility-hint">{listed ? "Listed for one hour." : "Anyone with the link can join."}</p>
+          <p className="hint visibility-hint">{listed ? "Listed for one hour." : "Share the link with a friend, or add a bot."}</p>
           <button type="button" onClick={createRoom} disabled={busy}>{entering === "create" ? "Creating room…" : "Create a room"}</button>
           {createError && <p className="error" role="alert">{createError}</p>}
           <GuestPanel disabled={entering !== null} onSaving={setSavingName} onSaved={() => setRefreshKey(value => value + 1)} />

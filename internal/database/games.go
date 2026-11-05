@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/StephenCotterrell/azulwithfriends/internal/game"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -72,11 +73,24 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 			return Room{}, ErrIllegalMove
 		}
 	}
+	snapshot.revision++
+	// The first player is random, and the first-player marker can give the
+	// bot consecutive drafts across rounds. Commit only when the host can
+	// act again or the game has ended, so refreshes never need to drive it.
+	for snapshot.room.Seats[1].IsBot && snapshot.state.Turn == 2 && !snapshot.state.Finished {
+		botMove, ok := snapshot.state.BotMove()
+		if !ok {
+			return Room{}, errors.New("bot has no move on its turn")
+		}
+		if err := snapshot.state.Apply(2, botMove); err != nil {
+			return Room{}, fmt.Errorf("apply bot move: %w", err)
+		}
+		snapshot.revision++
+	}
 	encoded, err := json.Marshal(snapshot.state)
 	if err != nil {
 		return Room{}, err
 	}
-	snapshot.revision++
 	if _, err := tx.Exec(ctx, "UPDATE rooms SET game_state = $2::jsonb, game_revision = $3 WHERE id = $1", snapshot.room.ID, string(encoded), snapshot.revision); err != nil {
 		return Room{}, err
 	}

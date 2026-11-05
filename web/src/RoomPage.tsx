@@ -1,10 +1,26 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { APIError, inviteURL, postJSON, requestJSON, roomName, roomPath, type Room } from "./api";
+import { APIError, inviteURL, postJSON, requestJSON, roomName, roomPath, type Move, type Room } from "./api";
 import { GuestPanel } from "./GuestPanel";
 import { GameTable, PlayGuide } from "./GameTable";
 
 function canJoin(room: Room) {
   return room.yourSeat === 0 && room.seats.length === 1 && !room.game;
+}
+
+type RoomAction =
+  | { name: "join" | "start"; body?: never }
+  | { name: "moves"; body: Move & { revision: number } }
+  | { name: "listing"; body: { listed: boolean } }
+  | { name: "bot"; body: { enabled: boolean } };
+
+function roomReflectsAction(room: Room, action: RoomAction) {
+  switch (action.name) {
+    case "join": return !canJoin(room);
+    case "start": return Boolean(room.game);
+    case "moves": return (room.game?.revision ?? 0) > action.body.revision;
+    case "listing": return room.listed === action.body.listed;
+    case "bot": return room.seats.some(seat => seat.isBot) === action.body.enabled;
+  }
 }
 
 function roomPageVisible() {
@@ -38,7 +54,9 @@ function InviteLink({ url }: { url: string }) {
   );
 }
 
-function Seats({ room, onRefresh }: { room: Room; onRefresh: () => void }) {
+function Seats({ room, pending, onBot, onRefresh }: {
+  room: Room; pending: RoomAction | null; onBot: (enabled: boolean) => void; onRefresh: () => void;
+}) {
   return (
     <section className="seats" aria-labelledby="players-heading">
       <div className="roster-art" aria-hidden="true" />
@@ -56,6 +74,11 @@ function Seats({ room, onRefresh }: { room: Room; onRefresh: () => void }) {
                 <span className="seat-number" aria-label={`Seat ${number}`}>{number}</span>
                 <span className="seat-name">{seat?.displayName ?? "Open seat"}</span>
                 {own && <span className="you">You</span>}
+                {room.yourSeat === 1 && number === 2 && (!seat || seat.isBot) && (
+                  <button type="button" className="secondary seat-action" disabled={!!pending} onClick={() => onBot(!seat)}>
+                    {pending?.name === "bot" ? (pending.body.enabled ? "Adding…" : "Removing…") : (seat ? "Remove bot" : "Add bot")}
+                  </button>
+                )}
               </li>
             );
           })}
@@ -73,16 +96,15 @@ export function RoomPage({ id }: { id: string }) {
   const [readError, setReadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [retryJoin, setRetryJoin] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [savingListing, setSavingListing] = useState<boolean | null>(null);
+  const [pending, setPending] = useState<RoomAction | null>(null);
   const writing = useRef(false);
   const triedInvite = useRef(false);
   const currentRead = useRef<AbortController | null>(null);
-  const uncertainWrite = useRef<{ action: "join" | "start" | "moves" | "listing"; revision: number; listed?: boolean } | null>(null);
+  const uncertainWrite = useRef<RoomAction | null>(null);
   const [revision, setRevision] = useState(0);
   const [paused, setPaused] = useState(false);
   const refresh = () => setRevision(value => value + 1);
-  const joinFromInvite = useEffectEvent(() => { void act("join"); });
+  const joinFromInvite = useEffectEvent(() => { void act({ name: "join" }); });
 
   const slug = room?.slug;
   useEffect(() => {
@@ -113,15 +135,14 @@ export function RoomPage({ id }: { id: string }) {
         setRoom(snapshot);
         setReadError("");
         const uncertain = uncertainWrite.current;
-        if (uncertain?.action === "join") {
-          const open = canJoin(snapshot);
-          setRetryJoin(open);
-          setActionError(open ? "Couldn’t join the room. Try again." : "");
-          uncertainWrite.current = null;
-        } else if (uncertain) {
-          const confirmed = uncertain.action === "start" ? Boolean(snapshot.game) :
-            uncertain.action === "listing" ? snapshot.listed === uncertain.listed : (snapshot.game?.revision ?? 0) > uncertain.revision;
-          setActionError(confirmed ? "" : "The room is up to date. You can try again.");
+        if (uncertain) {
+          const confirmed = roomReflectsAction(snapshot, uncertain);
+          if (uncertain.name === "join") {
+            setRetryJoin(!confirmed);
+            setActionError(confirmed ? "" : "Couldn’t join the room. Try again.");
+          } else {
+            setActionError(confirmed ? "" : "The room is up to date. You can try again.");
+          }
           uncertainWrite.current = null;
         }
         // Claim once per visit, only after a visible page has checked the guest's seat.
@@ -169,32 +190,32 @@ export function RoomPage({ id }: { id: string }) {
     };
   }, [path, embedded, pending, missing, revision]);
 
-  async function act(action: "join" | "start" | "moves" | "listing", body: object = {}) {
+  async function act(action: RoomAction) {
     if (writing.current) return;
     writing.current = true;
     currentRead.current?.abort();
-    setPending(true);
+    setPending(action);
     setActionError("");
-    if (action === "join") setRetryJoin(false);
+    if (action.name === "join") setRetryJoin(false);
     try {
-      const updated = await postJSON<Room>(`${path}/${action}`, body);
+      const updated = await postJSON<Room>(`${path}/${action.name}`, action.body ?? {});
       setRoom(updated);
       setReadError("");
     } catch (cause) {
-      if (action === "join" && cause instanceof APIError && cause.status === 409) {
+      if (action.name === "join" && cause instanceof APIError && cause.status === 409) {
         // Another visitor took the last seat. The refresh below shows the full room.
         return;
       }
       if (!(cause instanceof APIError) || cause.status >= 500) {
-        uncertainWrite.current = { action, revision: room?.game?.revision ?? 0, listed: action === "listing" ? !room?.listed : undefined };
+        uncertainWrite.current = action;
         setActionError("Checking the latest room state…");
       } else {
         setActionError(cause instanceof Error ? cause.message : "Couldn’t update this room. Try again.");
-        if (action === "join") setRetryJoin(true);
+        if (action.name === "join") setRetryJoin(true);
       }
     } finally {
       writing.current = false;
-      setPending(false);
+      setPending(null);
       refresh();
     }
   }
@@ -202,9 +223,11 @@ export function RoomPage({ id }: { id: string }) {
   const full = room?.seats.length === 2;
   const seated = Boolean(room?.yourSeat);
   const host = room?.yourSeat === 1;
+  const bot = room?.seats.find(seat => seat.isBot);
   const title = missing ? "Room not found" : room ? roomName(room.slug) : "Room for two";
   let status = "";
-  if (host && !full) status = room?.listed ? "Waiting for a second player." : "Invite a friend to take the open seat.";
+  if (host && !full) status = room?.listed ? "Waiting for a second player." : "Invite a friend or add a bot to the open seat.";
+  else if (host && bot) status = `${bot.displayName} is ready to play.`;
   else if (seated && !host) status = "Waiting for the host to start.";
   else if (!seated && full) status = "Both seats are taken.";
   else if (!seated && !embedded && !retryJoin) status = "Joining room…";
@@ -217,11 +240,11 @@ export function RoomPage({ id }: { id: string }) {
       {actionError && <p className="game-error" role="alert">{actionError}</p>}
       {readError && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>}
       {room?.game ? <>
-        <GameTable room={room} game={room.game} busy={pending} onMove={move => void act("moves", move)} />
+        <GameTable room={room} game={room.game} busy={!!pending} onMove={move => void act({ name: "moves", body: move })} />
         <div className="game-tools">
           <PlayGuide />
-          <details className="room-settings"><summary>Room and invite</summary>
-            <InviteLink url={inviteURL(room.slug)} />
+          <details className="room-settings"><summary>{bot ? "Room settings" : "Room and invite"}</summary>
+            {!bot && <InviteLink url={inviteURL(room.slug)} />}
             <GuestPanel onSaved={refresh} />
           </details>
           <button type="button" className="text-button" onClick={refresh}>Refresh table</button>
@@ -234,25 +257,21 @@ export function RoomPage({ id }: { id: string }) {
           {room && <>
             {status && <p className="intro" role="status">{status}</p>}
             {seated ? <>
-              {host && full && <button type="button" className="start-game" onClick={() => void act("start")} disabled={pending}>{pending ? "Starting…" : "Start game"}</button>}
-              <InviteLink url={inviteURL(room.slug)} />
+              {host && full && <button type="button" className="start-game" onClick={() => void act({ name: "start" })} disabled={!!pending}>{pending?.name === "start" ? "Starting…" : "Start game"}</button>}
+              {!bot && <InviteLink url={inviteURL(room.slug)} />}
               {host && !full && <div className="listing-control">
-                <label><input type="checkbox" checked={savingListing ?? room.listed} disabled={pending}
-                  onChange={event => {
-                    const listed = event.target.checked;
-                    setSavingListing(listed);
-                    void act("listing", { listed }).finally(() => setSavingListing(null));
-                  }} />List in public lobby</label>
+                <label><input type="checkbox" checked={pending?.name === "listing" ? pending.body.listed : room.listed} disabled={!!pending}
+                  onChange={event => void act({ name: "listing", body: { listed: event.target.checked } })} />List in public lobby</label>
                 <p className="hint">Offer your open seat for one hour.</p>
               </div>}
               <GuestPanel onSaved={refresh} />
             </> : full ? <a href="/">Create your own room</a> :
               embedded ? <a href={roomPath(room.slug)} target="_blank" rel="noopener noreferrer">Open room</a> : retryJoin &&
-              <button type="button" onClick={() => void act("join")} disabled={pending}>Retry joining</button>}
+              <button type="button" onClick={() => void act({ name: "join" })} disabled={!!pending}>Retry joining</button>}
           </>}
           {paused && !readError && <p className="hint">Automatic updates paused. Refresh to see the latest players.</p>}
         </div>
-        {room && <Seats room={room} onRefresh={refresh} />}
+        {room && <Seats room={room} pending={pending} onBot={enabled => void act({ name: "bot", body: { enabled } })} onRefresh={refresh} />}
       </div>}
     </main>
   );

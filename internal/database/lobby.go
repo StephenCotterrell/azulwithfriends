@@ -9,7 +9,7 @@ import (
 
 var (
 	ErrNotListed = errors.New("This room is no longer in the lobby.")
-	ErrNotHost   = errors.New("Only the room creator can change its listing.")
+	ErrNotHost   = errors.New("Only the room host can change room settings.")
 )
 
 // A host can list again after an hour. Expiry affects discovery and lobby
@@ -43,7 +43,7 @@ func ListLobby(ctx context.Context, pool *pgxpool.Pool, sessionHash []byte) ([]L
 		if err := rows.Scan(&room.Slug, &name, &room.IsHost); err != nil {
 			return nil, err
 		}
-		room.HostName = seatLabel(1, name).DisplayName
+		room.HostName = seatLabel(1, name, false).DisplayName
 		rooms = append(rooms, room)
 	}
 	return rooms, rows.Err()

@@ -156,7 +156,7 @@ export function GameTable({ room, game, busy, onMove }: {
         <><strong>{selected.count} {selected.color}</strong> · Choose a line or the floor.</> :
         active ? "Choose a tile color." : null}</div>
     </>}
-    {game.lastMove && <p className="last-draft"><strong>Last draft</strong> {name(game.lastMove.seat)} took {game.lastMove.count} {game.lastMove.color} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</p>}
+    {game.lastMove && <p className="last-draft" role="status"><strong>Last draft</strong> {name(game.lastMove.seat)} took {game.lastMove.count} {game.lastMove.color} from {game.lastMove.source === 0 ? "the center" : sourceName(game.lastMove.source)} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</p>}
     <div className="boards">{[room.yourSeat, 3 - room.yourSeat].map(seat =>
       <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
         selected={selected} legalMoves={game.legalMoves} onPlace={place} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} />
