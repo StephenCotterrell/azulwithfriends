@@ -74,7 +74,6 @@ export function Lobby({ entering, disabled, joinError, refreshKey, onJoin }: Pro
         {rooms === null ? !loadError && <p role="status">Looking for open seats…</p> :
           rooms.length === 0 ? <div className="lobby-empty">
             <p>No open rooms right now.</p>
-            <p className="hint">Create a public room to offer a seat.</p>
           </div> :
           <ul className="lobby-list" aria-label="Open rooms">
             {rooms.map(({ slug, hostName, isHost }) => {

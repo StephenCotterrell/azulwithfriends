@@ -98,7 +98,6 @@ fieldset.room-visibility { min-width: 0; border: 0; margin: 0; padding: 0; }
 .lobby-heading h2 { font: 400 clamp(1.9rem, 3.4vw, 3rem)/1.1 Georgia, serif; color: #213f52; letter-spacing: -.045em; margin: 0; }
 .lobby-empty { padding: 22px 0 9px; }
 .lobby-empty p { margin: 0; }
-.lobby-empty .hint { margin-top: 3px; }
 .lobby-list { list-style: none; padding: 0; margin: 0; max-height: 52vh; overflow-y: auto; }
 .lobby-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 12px; padding: 16px 0; border-bottom: 1px solid #d9dfd5; }
 .lobby-list li:last-child { border-bottom: 0; padding-bottom: 1px; }

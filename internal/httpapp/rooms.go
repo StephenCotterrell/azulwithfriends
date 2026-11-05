@@ -155,7 +155,7 @@ func roomError(w http.ResponseWriter, err error) {
 		problem(w, http.StatusNotFound, "Room not found. Check the invitation link.")
 	case errors.Is(err, database.ErrRoomFull):
 		problem(w, http.StatusConflict, "Both seats in this room are taken.")
-	case errors.Is(err, database.ErrNoSeat), errors.Is(err, database.ErrNotHost):
+	case errors.Is(err, database.ErrNoSeat), errors.Is(err, database.ErrNotHost), errors.Is(err, database.ErrStartRequiresHost):
 		problem(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, database.ErrNotListed), errors.Is(err, database.ErrNeedPlayers), errors.Is(err, database.ErrNotStarted),
 		errors.Is(err, database.ErrStaleMove), errors.Is(err, database.ErrIllegalMove):

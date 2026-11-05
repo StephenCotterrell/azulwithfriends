@@ -84,6 +84,6 @@ func TestHostListingAndGuestLobbyJoin(t *testing.T) {
 	if len(retry.Result().Cookies()) != 0 {
 		t.Fatal("a repeat lobby join replaced the guest's cookie")
 	}
-	post(bySlug+"/start", "{}", friend, 200)
+	post(bySlug+"/start", "{}", host, 200)
 	checkLobby(nil)
 }

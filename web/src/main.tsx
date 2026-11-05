@@ -68,7 +68,6 @@ function Welcome() {
         </div>
         <h1>Azul <em>with friends</em></h1>
         <div className="entry-panel">
-          <p className="intro">Invite a friend to your table or take an open seat.</p>
           <fieldset className="room-visibility" disabled={busy}>
             <legend>Room visibility</legend>
             <div className="visibility-options">
@@ -76,7 +75,7 @@ function Welcome() {
               <label><input type="radio" name="visibility" checked={listed} onChange={() => setListed(true)} />Public lobby</label>
             </div>
           </fieldset>
-          <p className="hint visibility-hint">{listed ? "Offer your open seat in the lobby for one hour." : "Anyone with your invitation link can join."}</p>
+          <p className="hint visibility-hint">{listed ? "Listed for one hour." : "Anyone with the link can join."}</p>
           <button type="button" onClick={createRoom} disabled={busy}>{entering === "create" ? "Creating room…" : "Create a room"}</button>
           {createError && <p className="error" role="alert">{createError}</p>}
           <GuestPanel disabled={entering !== null} onSaving={setSavingName} onSaved={() => setRefreshKey(value => value + 1)} />
