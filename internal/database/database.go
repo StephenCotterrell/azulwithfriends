@@ -25,6 +25,9 @@ var lobbyMigration string
 //go:embed migrations/005_bot_seats.sql
 var botSeatMigration string
 
+//go:embed migrations/006_player_rooms_index.sql
+var playerRoomsIndexMigration string
+
 func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(url)
 	if err != nil {
@@ -64,6 +67,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		{3, gameMigration},
 		{4, lobbyMigration},
 		{5, botSeatMigration},
+		{6, playerRoomsIndexMigration},
 	} {
 		var applied bool
 		if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)", migration.version).Scan(&applied); err != nil {

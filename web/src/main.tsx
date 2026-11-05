@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { GuestPanel } from "./GuestPanel";
 import { Lobby } from "./Lobby";
 import { RoomPage } from "./RoomPage";
-import { APIError, postJSON, requestJSON, roomPath, type Room } from "./api";
+import { APIError, postJSON, requestJSON, roomName, roomPath, type Room } from "./api";
 import "./styles.css";
 
 function Welcome() {
@@ -13,6 +13,7 @@ function Welcome() {
   const [createError, setCreateError] = useState("");
   const [joinError, setJoinError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [resumeGame, setResumeGame] = useState<string | null>(null);
   const busy = entering !== null || savingName;
 
   useEffect(() => {
@@ -68,6 +69,10 @@ function Welcome() {
         </div>
         <h1>Azul <em>with friends</em></h1>
         <div className="entry-panel">
+          {resumeGame && <a className="resume-game" href={busy ? undefined : roomPath(resumeGame)} aria-disabled={busy || undefined}>
+            <strong>Resume game</strong>
+            <span>{roomName(resumeGame)}</span>
+          </a>}
           <fieldset className="room-visibility" disabled={busy}>
             <legend>Room visibility</legend>
             <div className="visibility-options">
@@ -81,7 +86,8 @@ function Welcome() {
           <GuestPanel disabled={entering !== null} onSaving={setSavingName} onSaved={() => setRefreshKey(value => value + 1)} />
         </div>
       </div>
-      <Lobby entering={entering} disabled={busy} joinError={joinError} refreshKey={refreshKey} onJoin={joinRoom} />
+      <Lobby entering={entering} disabled={busy} joinError={joinError} refreshKey={refreshKey}
+        onJoin={joinRoom} onResumeGame={setResumeGame} />
     </main>
   );
 }

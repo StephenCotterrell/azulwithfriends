@@ -44,6 +44,14 @@ h1 em {
   color: #2d696c;
 }
 .entry-panel { margin-top: clamp(32px, 4.6vw, 65px); max-width: 377px; }
+.resume-game {
+  display: grid; gap: 3px; padding: 11px 16px; margin-bottom: 22px;
+  border: 1px solid #abc3b5; border-radius: 6px;
+  background: #e4ede4; text-decoration: none; overflow-wrap: anywhere;
+}
+.resume-game strong { text-decoration: underline; text-underline-offset: .2em; }
+.resume-game span { color: #375b56; font-size: .91rem; }
+.resume-game:hover { background: #d9e7d9; }
 p { line-height: 1.55; }
 .intro { font-size: 1.125rem; margin: 0 0 27px; }
 .field-label { display: block; font-size: .9rem; font-weight: 650; margin-bottom: 8px; }

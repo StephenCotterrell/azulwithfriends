@@ -24,15 +24,25 @@ func validRoomKey(key string) bool {
 func (a *app) lobby(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	rooms, err := database.ListLobby(ctx, a.db, a.sessionHash(r))
+	hash := a.sessionHash(r)
+	rooms, err := database.ListLobby(ctx, a.db, hash)
 	if err != nil {
 		slog.Error("lobby database request failed", "error", err)
 		problem(w, http.StatusServiceUnavailable, "The lobby is temporarily unavailable. Please try again.")
 		return
 	}
+	preferred := r.Header.Get("X-Recent-Game")
+	if !roomSlugPattern.MatchString(preferred) {
+		preferred = ""
+	}
+	resumeGame, err := database.FindResumableGame(ctx, a.db, hash, preferred)
+	if err != nil {
+		slog.Error("resume game database request failed", "error", err)
+	}
 	writeJSON(w, http.StatusOK, struct {
-		Rooms []database.LobbyRoom `json:"rooms"`
-	}{rooms})
+		Rooms      []database.LobbyRoom `json:"rooms"`
+		ResumeGame string               `json:"resumeGame,omitempty"`
+	}{rooms, resumeGame})
 }
 
 func (a *app) getRoom(w http.ResponseWriter, r *http.Request) {
