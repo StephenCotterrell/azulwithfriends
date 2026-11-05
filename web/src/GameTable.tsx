@@ -28,8 +28,8 @@ function TilePatterns() {
   </svg>;
 }
 
-function Ceramic({ color, ghost = false, preview = false }: { color?: Tile; ghost?: boolean; preview?: boolean }) {
-  return <span aria-hidden="true" className={`ceramic ${color ?? "blank"}${ghost ? " ghost" : ""}${preview ? " preview" : ""}`}>
+function Ceramic({ color, ghost = false, preview = false, pending = false }: { color?: Tile; ghost?: boolean; preview?: boolean; pending?: boolean }) {
+  return <span aria-hidden="true" className={`ceramic ${color ?? "blank"}${ghost ? " ghost" : ""}${preview ? " preview" : ""}${pending ? " pending" : ""}`}>
     {color && <svg focusable="false" viewBox="0 0 32 32"><use href={`#motif-${color}`}/></svg>}
   </span>;
 }
@@ -121,7 +121,11 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
           <div className="wall-row" role="group" aria-label={`Wall row ${row}`}>
             {wall.map((filled, col) => {
               const color = colors[(col - index + 5) % 5];
-              return <span key={col} role="img" aria-label={`${color}, ${filled ? "filled" : "empty"}`}><Ceramic color={color} ghost={!filled} /></span>;
+              const pending = !filled && line.count === row && line.color === color;
+              return <span key={col} role="img" aria-label={`${color}, ${filled ? "filled" : pending ? "pending until end of round" : "empty"}`}
+                title={pending ? "Completed pattern line: this tile will move here at the end of the round." : undefined}>
+                <Ceramic color={color} ghost={!filled} pending={pending} />
+              </span>;
             })}
           </div>
         </div>;
