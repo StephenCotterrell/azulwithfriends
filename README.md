@@ -6,6 +6,8 @@ The game uses the standard colored wall. The server randomly selects the first p
 
 During a bot match or from its final scores, choose **Leave game**, then **Leave and close room**. This removes the saved game, closes the invitation, and returns you to the lobby.
 
+Your opponent’s live miniature board shows their pattern lines, wall, floor and score while you play. It stays beside the table on desktop and at the top of the screen as you scroll on mobile. Final scores show both full-size boards.
+
 Rooms have a four-word name and an invitation at `https://azulwithfriends.com/room/<name>`. Link-only rooms are the default. The host can list or unlist an open seat. A public listing lasts one hour and disappears when the second player joins. The invitation continues to work after unlisting or expiry.
 
 A private cookie remembers each player's seat on the original host in that browser for up to 30 days. Earlier UUID invitations still open the same room. If you started a game on the Railway hostname, use its original link to resume your seat there.

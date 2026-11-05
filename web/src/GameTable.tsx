@@ -76,16 +76,18 @@ function Supply({ game, active, selected, onPick }: {
   </section>;
 }
 
-function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round }: {
+function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round, compact = false }: {
   player: Board; seat: number; own: boolean; name: string; selected: Pick | null; legalMoves: Move[];
   previewMarker: boolean; busy: boolean;
-  onPlace: (row: number, clickCount: number) => void; onChangeTiles: () => void; previous?: RoundScore; round?: number;
+  onPlace: (row: number, clickCount: number) => void; onChangeTiles: () => void; previous?: RoundScore; round?: number; compact?: boolean;
 }) {
   const allowed = (row: number) => own && !!selected && legalMoves.some(move =>
     move.source === selected.source && move.color === selected.color && move.row === row);
-  return <section className={`player-board${own ? " own" : ""}`} aria-label={`${name}, seat ${seat}`}>
+  return <section className={`player-board${own ? " own" : ""}${compact ? " compact" : ""}`} aria-label={`${name}, seat ${seat}${compact ? ", opponent board" : ""}`}>
     <header className="board-header">
-      <h2>{name} {own && <small>You</small>}</h2>
+      <div className="board-player">{compact && <span className="opponent-label">Opponent</span>}
+        <h2 title={name}>{name} {own && <small>You</small>}</h2>
+      </div>
       <p className="points"><strong>{player.score}</strong> pts</p>
     </header>
     {selected && <div className="placement-summary">
@@ -138,7 +140,7 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
         <Ceramic color={tile} preview={preview} /><span aria-hidden="true">−{cost}</span>
       </li>;
     })}</ol>
-    {previous && <p className="round-score">Round {round} <span>+{previous.wall} wall</span><span>−{previous.penalty} floor</span></p>}
+    {previous && !compact && <p className="round-score">Round {round} <span>+{previous.wall} wall</span><span>−{previous.penalty} floor</span></p>}
   </section>;
 }
 
@@ -167,6 +169,7 @@ export function GameTable({ room, game, busy, onMove }: {
 }) {
   const [pick, setPick] = useState<Pick | null>(null);
   const table = useRef<HTMLDivElement>(null);
+  const opponent = useRef<HTMLElement>(null);
   const sourceButton = useRef<HTMLButtonElement | null>(null);
   const submittedRevision = useRef<number | null>(null);
   const name = (seat: number) => room.seats.find(p => p.number === seat)?.displayName ?? `Player ${seat}`;
@@ -174,6 +177,17 @@ export function GameTable({ room, game, busy, onMove }: {
   const active = yourTurn && !busy;
   const selected = yourTurn && pick?.revision === game.revision ? pick : null;
   const takesMarker = selected?.source === 0 && game.markerInCenter;
+
+  useLayoutEffect(() => {
+    const panel = opponent.current;
+    if (!panel) return;
+    // Keep focused controls below the sticky board, including with larger text.
+    const updateHeight = () => table.current?.style.setProperty("--opponent-height", `${panel.getBoundingClientRect().height}px`);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [game.finished]);
 
   useLayoutEffect(() => {
     if (!selected || !table.current) return;
@@ -203,6 +217,10 @@ export function GameTable({ room, game, busy, onMove }: {
     onMove({ source: selected.source, color: selected.color, row, revision: selected.revision });
   }
   const status = game.turn === room.yourSeat ? "Your turn" : `${name(game.turn)}’s turn`;
+  const renderBoard = (seat: number, compact = false) =>
+    <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
+      selected={seat === room.yourSeat ? selected : null} previewMarker={seat === room.yourSeat && takesMarker} legalMoves={game.legalMoves}
+      busy={busy} onPlace={place} onChangeTiles={changeTiles} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} compact={compact} />;
   return <div ref={table} className="game-table" data-game-revision={game.revision} data-turn={game.turn}
     onKeyDown={event => {
       // Holding Enter to pick must not also activate the newly focused destination.
@@ -212,19 +230,22 @@ export function GameTable({ room, game, busy, onMove }: {
     <div className="game-heading"><h1 tabIndex={-1}>{game.finished ? "Final scores" : `Round ${game.round}`}</h1>
       {!game.finished && <p className="turn" role="status"><i className={game.turn === room.yourSeat ? "active" : ""} />{status}</p>}
     </div>
-    {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} /> : <>
-      <Supply game={game} active={active} selected={selected} onPick={(nextPick, button) => {
-        sourceButton.current = button;
-        setPick(nextPick);
-      }} />
-      <div className="draft-help" role="status">{active && !selected ? "Choose a tile color." : null}</div>
-    </>}
-    {game.lastMove && <p className="last-draft" role="status"><strong>Last draft</strong> {name(game.lastMove.seat)} took {game.lastMove.count} {game.lastMove.color} from {game.lastMove.source === 0 ? "the center" : sourceName(game.lastMove.source)} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</p>}
-    <div className="boards">{[room.yourSeat, 3 - room.yourSeat].map(seat =>
-      <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
-        selected={seat === room.yourSeat ? selected : null} previewMarker={seat === room.yourSeat && takesMarker} legalMoves={game.legalMoves}
-        busy={busy} onPlace={place} onChangeTiles={changeTiles} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} />
-    )}</div>
+    <div className={game.finished ? "finished-table" : "match-layout"}>
+      {!game.finished && <aside ref={opponent} className="opponent-overview" aria-label="Opponent overview">
+        {renderBoard(3 - room.yourSeat, true)}
+      </aside>}
+      <div className="match-main">
+        {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} /> : <>
+          <Supply game={game} active={active} selected={selected} onPick={(nextPick, button) => {
+            sourceButton.current = button;
+            setPick(nextPick);
+          }} />
+          <div className="draft-help" role="status">{active && !selected ? "Choose a tile color." : null}</div>
+        </>}
+        {game.lastMove && <p className="last-draft" role="status"><strong>Last draft</strong> {name(game.lastMove.seat)} took {game.lastMove.count} {game.lastMove.color} from {game.lastMove.source === 0 ? "the center" : sourceName(game.lastMove.source)} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</p>}
+        <div className="boards">{(game.finished ? [room.yourSeat, 3 - room.yourSeat] : [room.yourSeat]).map(seat => renderBoard(seat))}</div>
+      </div>
+    </div>
   </div>;
 }
 
