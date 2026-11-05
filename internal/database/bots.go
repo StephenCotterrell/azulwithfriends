@@ -7,7 +7,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var ErrGameStarted = errors.New("The seats are fixed once the game starts.")
+var (
+	ErrGameStarted = errors.New("The seats are fixed once the game starts.")
+	ErrNeedBotGame = errors.New("Only a started game against a bot can be closed.")
+)
 
 // SetRoomBot competes for the same open seat as a guest joining by link or lobby.
 func SetRoomBot(ctx context.Context, pool *pgxpool.Pool, key string, sessionHash []byte, enabled bool) (Room, error) {
@@ -19,15 +22,9 @@ func SetRoomBot(ctx context.Context, pool *pgxpool.Pool, key string, sessionHash
 		return Room{}, err
 	}
 	defer tx.Rollback(ctx)
-	if err := lockRoom(ctx, tx, key); err != nil {
-		return Room{}, err
-	}
-	room, err := GetRoom(ctx, tx, key, sessionHash)
+	room, err := lockHostRoom(ctx, tx, key, sessionHash)
 	if err != nil {
 		return Room{}, err
-	}
-	if room.YourSeat != 1 {
-		return Room{}, ErrNotHost
 	}
 	if room.Game != nil {
 		return Room{}, ErrGameStarted
@@ -56,4 +53,28 @@ func SetRoomBot(ctx context.Context, pool *pgxpool.Pool, key string, sessionHash
 		return Room{}, err
 	}
 	return room, nil
+}
+
+// CloseBotGame permanently removes the room and its seats while preserving
+// the host's guest identity. It shares the room lock used by human drafts.
+func CloseBotGame(ctx context.Context, pool *pgxpool.Pool, key string, sessionHash []byte) error {
+	if len(sessionHash) == 0 {
+		return ErrNotHost
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	room, err := lockHostRoom(ctx, tx, key, sessionHash)
+	if err != nil {
+		return err
+	}
+	if room.Game == nil || len(room.Seats) != roomCapacity || !room.Seats[1].IsBot {
+		return ErrNeedBotGame
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM rooms WHERE id = $1", room.ID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }

@@ -58,15 +58,9 @@ func SetRoomListing(ctx context.Context, pool *pgxpool.Pool, key string, session
 		return Room{}, err
 	}
 	defer tx.Rollback(ctx)
-	if err := lockRoom(ctx, tx, key); err != nil {
-		return Room{}, err
-	}
-	room, err := GetRoom(ctx, tx, key, sessionHash)
+	room, err := lockHostRoom(ctx, tx, key, sessionHash)
 	if err != nil {
 		return Room{}, err
-	}
-	if room.YourSeat != 1 {
-		return Room{}, ErrNotHost
 	}
 	if listed && (len(room.Seats) == roomCapacity || room.Game != nil) {
 		return Room{}, ErrRoomFull

@@ -177,6 +177,20 @@ func lockRoom(ctx context.Context, tx pgx.Tx, id string) error {
 	return tx.QueryRow(ctx, "SELECT 1 FROM rooms r WHERE "+roomKeyColumn(id)+" = $1 FOR UPDATE", id).Scan(&locked)
 }
 
+func lockHostRoom(ctx context.Context, tx pgx.Tx, key string, sessionHash []byte) (Room, error) {
+	if err := lockRoom(ctx, tx, key); err != nil {
+		return Room{}, err
+	}
+	room, err := GetRoom(ctx, tx, key, sessionHash)
+	if err != nil {
+		return Room{}, err
+	}
+	if room.YourSeat != 1 {
+		return Room{}, ErrNotHost
+	}
+	return room, nil
+}
+
 func seatAndCommit(ctx context.Context, tx pgx.Tx, room Room, session RoomSession) (Room, bool, error) {
 	var player Player
 	if len(session.ExistingHash) > 0 {

@@ -29,6 +29,24 @@ func (a *app) startGame(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, room)
 }
 
+func (a *app) closeBotGame(w http.ResponseWriter, r *http.Request) {
+	if !a.readEmptyObject(w, r) {
+		return
+	}
+	id := r.PathValue("id")
+	if !validRoomKey(id) {
+		roomError(w, pgx.ErrNoRows)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if err := database.CloseBotGame(ctx, a.db, id, a.sessionHash(r)); err != nil {
+		roomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"closed": true})
+}
+
 func (a *app) playMove(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Revision int    `json:"revision"`
