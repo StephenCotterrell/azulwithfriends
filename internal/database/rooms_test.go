@@ -47,6 +47,24 @@ func TestUpgradePreservesExistingGuest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Seed an invitation from the version that shipped two-seat waiting rooms.
+	v2, err := os.ReadFile("migrations/002_rooms.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, string(v2), pgx.QueryExecModeSimpleProtocol); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES (2)"); err != nil {
+		t.Fatal(err)
+	}
+	var oldRoomID string
+	if err := pool.QueryRow(ctx, "INSERT INTO rooms DEFAULT VALUES RETURNING id::text").Scan(&oldRoomID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, "INSERT INTO room_seats(room_id, number, player_id) VALUES ($1, 1, $2)", oldRoomID, before.ID); err != nil {
+		t.Fatal(err)
+	}
 	for range 2 {
 		if err := database.Migrate(ctx, pool); err != nil {
 			t.Fatal(err)
@@ -56,6 +74,17 @@ func TestUpgradePreservesExistingGuest(t *testing.T) {
 	after, err := database.FindPlayer(ctx, pool, session.ExistingHash)
 	if err != nil || after != before {
 		t.Fatalf("guest after upgrade = %+v, %v; want %+v", after, err, before)
+	}
+	existing, err := database.GetRoom(ctx, pool, oldRoomID, session.ExistingHash)
+	if err != nil || existing.Game != nil || existing.YourSeat != 1 || existing.Seats[0].DisplayName != "Robin" {
+		t.Fatalf("old invitation after upgrade = %+v, error %v", existing, err)
+	}
+	if _, _, err := database.JoinRoom(ctx, pool, oldRoomID, guestSession()); err != nil {
+		t.Fatal(err)
+	}
+	started, err := database.StartGame(ctx, pool, oldRoomID, session.ExistingHash)
+	if err != nil || started.Game == nil || started.Game.Revision != 1 {
+		t.Fatalf("start game in an existing room: %+v, %v", started, err)
 	}
 	room, created, err := database.CreateRoom(ctx, pool, session)
 	if err != nil || created || room.YourSeat != 1 || room.Seats[0].DisplayName != "Robin" {

@@ -42,6 +42,11 @@ func TestRoomLinksAndInvalidRequests(t *testing.T) {
 		{"/api/rooms", "null", "", "application/json", 400},
 		{"/api/rooms", `{"yourSeat":1}`, "", "application/json", 400},
 		{"/api/rooms/not-a-uuid/join", "{}", "", "application/json", 404},
+		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/start", "{}", "https://other.example", "application/json", 403},
+		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/start", "null", "", "application/json", 400},
+		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/moves", `{"revision":1,"color":"red","row":0}`, "", "application/json", 400},
+		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/moves", `{"revision":1,"color":"red","source":0}`, "", "application/json", 400},
+		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/moves", `{"revision":1,"color":"red","source":0,"row":0,"seat":1}`, "", "application/json", 400},
 	} {
 		req := httptest.NewRequest("POST", "https://game.example"+tc.path, strings.NewReader(tc.body))
 		req.Header.Set("Content-Type", tc.contentType)
@@ -67,9 +72,10 @@ func TestAnonymousRoomInvitation(t *testing.T) {
 		DisplayName string `json:"displayName"`
 	}
 	type view struct {
-		ID       string `json:"id"`
-		Seats    []seat `json:"seats"`
-		YourSeat int    `json:"yourSeat"`
+		ID       string          `json:"id"`
+		Seats    []seat          `json:"seats"`
+		YourSeat int             `json:"yourSeat"`
+		Game     json.RawMessage `json:"game"`
 	}
 	readView := func(rec *httptest.ResponseRecorder, status, yourSeat int, wantSeats ...seat) view {
 		t.Helper()
@@ -77,7 +83,7 @@ func TestAnonymousRoomInvitation(t *testing.T) {
 		decoder := json.NewDecoder(rec.Body)
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&v); err != nil || rec.Code != status || v.YourSeat != yourSeat ||
-			!roomIDPattern.MatchString(v.ID) || !slices.Equal(v.Seats, wantSeats) ||
+			!roomIDPattern.MatchString(v.ID) || !slices.Equal(v.Seats, wantSeats) || string(v.Game) != "null" ||
 			rec.Header().Get("Cache-Control") != "no-store" {
 			t.Fatalf("got %d, %+v, error %v; want %d, seat %d, roster %+v", rec.Code, v, err, status, yourSeat, wantSeats)
 		}

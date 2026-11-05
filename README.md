@@ -1,8 +1,12 @@
 # Azul with Friends
 
-A browser game in development with Go, React, TypeScript and PostgreSQL. Choose **Create a room** to take the first seat, then share the room URL with a friend. They can open it and choose **Join room** to take the second seat. Each player can use the default seat name or pick a display name.
+A two-player browser adaptation of Azul built with Go, React, TypeScript and PostgreSQL. Choose **Create a room**, share its URL with a friend, and have them choose **Join room**. Either player can then choose **Start game**. Names are optional.
 
-Rooms are unlisted. Anyone with the URL can view the seats and claim an open one. A private cookie remembers each player's seat in that browser for up to 30 days. Sharing the URL shares access to the room, while your seat stays with your browser. Tile drafting and scoring are the next milestone.
+The game uses the standard colored wall. The server randomly selects the first player. On your turn, select a color from one factory or the center, then choose a highlighted pattern line or the floor. Both boards score automatically after each round. Completing a wall row triggers final scoring at the end of that round. To play again, create a new room. [Publisher’s rulebook](https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf)
+
+Rooms are unlisted. Anyone with the URL can view the seats and claim an open one. A private cookie remembers each player's seat in that browser for up to 30 days. Return to the same URL in the same browser to resume a match or see its result.
+
+Go validates each draft against the current turn and board revision, then commits it to PostgreSQL under a room lock. The saved position includes the bag and shuffle state so a restart can resume mid-round. The browser receives the visible boards, offers, and legal moves.
 
 ## Run locally
 
@@ -44,4 +48,4 @@ Railway builds the Go binary and frontend together from the Dockerfile. Its pre-
 | `PORT` | Listen port, default `8080` |
 | `WEB_DIST_DIR` | Compiled frontend directory, default `web/dist` |
 
-Store credentials in Railway service variables. Use the development Neon branch for remote development and the production branch for the deployed app. Keep production cookies secure. To check a release, create a room in one browser, open its invite in a private window and join. Refresh both windows and check that each returns to its own seat.
+Store credentials in Railway service variables. Use the development Neon branch for remote development and the production branch for the deployed app. Keep production cookies secure. To check a release, create a room, join from a private window, start a game, draft in each window, and reload both. Confirm that each returns to its own seat with the same board and scores.

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { APIError, postJSON, requestJSON, type Room } from "./api";
 import { GuestPanel } from "./GuestPanel";
+import { GameTable, PlayGuide } from "./GameTable";
 
 function InviteLink({ url }: { url: string }) {
   const [notice, setNotice] = useState("");
@@ -61,14 +62,17 @@ export function RoomPage({ id }: { id: string }) {
   const [room, setRoom] = useState<Room | null>(null);
   const [missing, setMissing] = useState(false);
   const [readError, setReadError] = useState("");
-  const [joinError, setJoinError] = useState("");
-  const [joining, setJoining] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [pending, setPending] = useState(false);
+  const writing = useRef(false);
+  const currentRead = useRef<AbortController | null>(null);
+  const uncertainWrite = useRef<{ action: "join" | "start" | "moves"; revision: number } | null>(null);
   const [revision, setRevision] = useState(0);
   const [paused, setPaused] = useState(false);
   const refresh = () => setRevision(value => value + 1);
 
   useEffect(() => {
-    if (joining || missing) return;
+    if (pending || missing) return;
     let controller: AbortController | undefined;
     let timer: number | undefined;
     let deadline: number;
@@ -77,24 +81,37 @@ export function RoomPage({ id }: { id: string }) {
       controller?.abort();
     }
     async function read() {
-      if (document.hidden) return;
+      if (document.hidden || writing.current) return;
       const request = new AbortController();
-      controller = request;
+      controller = currentRead.current = request;
       try {
         const snapshot = await requestJSON<Room>(path, { signal: request.signal });
         if (request.signal.aborted) return;
         setRoom(snapshot);
         setReadError("");
-        if (snapshot.yourSeat === 0 && snapshot.seats.length === 2) return;
-        if (Date.now() >= deadline) { setPaused(true); return; }
-        timer = window.setTimeout(read, snapshot.seats.length < 2 ? 10000 : 30000);
+        const uncertain = uncertainWrite.current;
+        if (uncertain) {
+          const confirmed = uncertain.action === "join" ? snapshot.yourSeat > 0 :
+            uncertain.action === "start" ? Boolean(snapshot.game) : (snapshot.game?.revision ?? 0) > uncertain.revision;
+          setActionError(confirmed ? "" : "The room is up to date. You can try again.");
+          uncertainWrite.current = null;
+        }
+        if (snapshot.game?.finished || (snapshot.yourSeat === 0 && snapshot.seats.length === 2)) return;
+        if (!snapshot.game && snapshot.seats.length === 1 && Date.now() >= deadline) {
+          setPaused(true);
+          return;
+        }
+        let delay = snapshot.seats.length === 2 && Date.now() < deadline ? 3500 : 7000;
+        if (snapshot.game) delay = snapshot.game.turn === snapshot.yourSeat ? 12000 : 2000;
+        timer = window.setTimeout(read, delay);
       } catch (cause) {
         if (request.signal.aborted) return;
         if (cause instanceof APIError && cause.status === 404) {
           setRoom(null);
           setMissing(true);
         } else {
-          setReadError("Couldn’t refresh this room. Check your connection and try again.");
+          setReadError("Connection interrupted. Reconnecting to the room…");
+          timer = window.setTimeout(read, 5000);
         }
       }
     }
@@ -107,22 +124,35 @@ export function RoomPage({ id }: { id: string }) {
     }
     resume();
     document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
     return () => {
       stop();
       document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", resume);
     };
-  }, [path, joining, missing, revision]);
+  }, [path, pending, missing, revision]);
 
-  async function join() {
-    if (joining) return;
-    setJoining(true);
-    setJoinError("");
+  async function act(action: "join" | "start" | "moves", body: object = {}) {
+    if (writing.current) return;
+    writing.current = true;
+    currentRead.current?.abort();
+    setPending(true);
+    setActionError("");
     try {
-      setRoom(await postJSON<Room>(`${path}/join`));
+      const updated = await postJSON<Room>(`${path}/${action}`, body);
+      setRoom(updated);
+      setReadError("");
     } catch (cause) {
-      setJoinError(cause instanceof Error ? cause.message : "Couldn’t join this room. Try again.");
+      if (!(cause instanceof APIError) || cause.status >= 500) {
+        uncertainWrite.current = { action, revision: room?.game?.revision ?? 0 };
+        setActionError("Checking the latest room state…");
+      } else {
+        setActionError(cause instanceof Error ? cause.message : "Couldn’t update this room. Try again.");
+      }
     } finally {
-      setJoining(false);
+      writing.current = false;
+      setPending(false);
+      refresh();
     }
   }
 
@@ -130,13 +160,25 @@ export function RoomPage({ id }: { id: string }) {
   const seated = Boolean(room?.yourSeat);
   const title = missing ? "Room not found" : "Room for two";
   const status = seated
-    ? (full ? "Both seats are filled. Tile play is coming in a later release." : "Send the link to a friend to fill the other seat.")
+    ? (full ? "Both players are here. Either of you can start the game." : "Send the link to a friend to fill the other seat.")
     : (full ? "Both seats are taken." : "There’s a seat for you at this table.");
 
   return (
-    <main className="room-page">
+    <main className={room?.game ? "room-page playing" : "room-page"}>
       <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a></header>
-      <div className="room-layout">
+      {actionError && <p className="game-error" role="alert">{actionError}</p>}
+      {readError && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>}
+      {room?.game ? <>
+        <GameTable room={room} game={room.game} busy={pending} onMove={move => void act("moves", move)} />
+        <div className="game-tools">
+          <PlayGuide />
+          <details className="room-settings"><summary>Room and invite</summary>
+            <InviteLink url={new URL(`/r/${room.id}`, window.location.origin).href} />
+            <GuestPanel onSaved={refresh} />
+          </details>
+          <button type="button" className="text-button" onClick={refresh}>Refresh table</button>
+        </div>
+      </> : <div className="room-layout">
         <div className="room-content">
           <h1>{title}</h1>
           {missing && <p className="intro">Check the invitation link or <a href="/">create a new room</a>.</p>}
@@ -144,17 +186,16 @@ export function RoomPage({ id }: { id: string }) {
           {room && <>
             <p className="intro" role="status">{status}</p>
             {seated ? <>
+              {full && <button type="button" className="start-game" onClick={() => void act("start")} disabled={pending}>{pending ? "Starting…" : "Start game"}</button>}
               <InviteLink url={new URL(`/r/${room.id}`, window.location.origin).href} />
               <GuestPanel onSaved={refresh} />
             </> : full ? <a href="/">Create your own room</a> :
-              <button type="button" onClick={join} disabled={joining}>{joining ? "Joining…" : "Join room"}</button>}
-            {joinError && <p className="error" role="alert">{joinError}</p>}
+              <button type="button" onClick={() => void act("join")} disabled={pending}>{pending ? "Joining…" : "Join room"}</button>}
           </>}
-          {readError && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Try again</button></div>}
           {paused && !readError && <p className="hint">Automatic updates paused. Refresh to see the latest players.</p>}
         </div>
         {room && <Seats room={room} onRefresh={refresh} />}
-      </div>
+      </div>}
     </main>
   );
 }

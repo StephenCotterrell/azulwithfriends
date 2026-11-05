@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/StephenCotterrell/azulwithfriends/internal/game"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -15,9 +16,15 @@ const roomCapacity = 2
 var ErrRoomFull = errors.New("room is full")
 
 type Room struct {
-	ID       string `json:"id"`
-	Seats    []Seat `json:"seats"`
-	YourSeat int    `json:"yourSeat"`
+	ID       string    `json:"id"`
+	Seats    []Seat    `json:"seats"`
+	YourSeat int       `json:"yourSeat"`
+	Game     *RoomGame `json:"game"`
+}
+
+type RoomGame struct {
+	Revision int `json:"revision"`
+	game.View
 }
 
 type Seat struct {
@@ -45,37 +52,63 @@ type roomReader interface {
 }
 
 func GetRoom(ctx context.Context, db roomReader, id string, sessionHash []byte) (Room, error) {
+	snapshot, err := readRoom(ctx, db, id, sessionHash)
+	if err != nil {
+		return Room{}, err
+	}
+	return snapshot.publicRoom(), nil
+}
+
+// The private state is separate from Room, the response sent to a browser.
+type roomSnapshot struct {
+	room     Room
+	state    *game.State
+	revision int
+}
+
+func (s roomSnapshot) publicRoom() Room {
+	if s.state != nil {
+		s.room.Game = &RoomGame{Revision: s.revision, View: s.state.View()}
+	}
+	return s.room
+}
+
+func readRoom(ctx context.Context, db roomReader, id string, sessionHash []byte) (roomSnapshot, error) {
 	rows, err := db.Query(ctx, `
-		SELECT seat.number, p.display_name, s.player_id IS NOT NULL
+		SELECT seat.number, p.display_name, s.player_id IS NOT NULL, r.game_revision,
+		       CASE WHEN s.player_id IS NOT NULL THEN r.game_state END
 		FROM room_seats seat
+		JOIN rooms r ON r.id = seat.room_id
 		JOIN players p ON p.id = seat.player_id
 		LEFT JOIN sessions s ON s.player_id = p.id AND s.token_hash = $2 AND s.expires_at > now()
 		WHERE seat.room_id = $1 ORDER BY seat.number`, id, sessionHash)
 	if err != nil {
-		return Room{}, err
+		return roomSnapshot{}, err
 	}
 	defer rows.Close()
-	room := Room{ID: id}
+	snapshot := roomSnapshot{room: Room{ID: id}}
 	for rows.Next() {
 		var number int
 		var name string
 		var ownsSeat bool
-		if err := rows.Scan(&number, &name, &ownsSeat); err != nil {
-			return Room{}, err
+		var state *game.State
+		if err := rows.Scan(&number, &name, &ownsSeat, &snapshot.revision, &state); err != nil {
+			return roomSnapshot{}, err
 		}
-		room.Seats = append(room.Seats, seatLabel(number, name))
+		snapshot.room.Seats = append(snapshot.room.Seats, seatLabel(number, name))
 		if ownsSeat {
-			room.YourSeat = number
+			snapshot.room.YourSeat = number
+			snapshot.state = state
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return Room{}, err
+		return roomSnapshot{}, err
 	}
 	// Room creation always commits its first seat in the same transaction.
-	if len(room.Seats) == 0 {
-		return Room{}, pgx.ErrNoRows
+	if len(snapshot.room.Seats) == 0 {
+		return roomSnapshot{}, pgx.ErrNoRows
 	}
-	return room, nil
+	return snapshot, nil
 }
 
 func CreateRoom(ctx context.Context, pool *pgxpool.Pool, session RoomSession) (Room, bool, error) {
@@ -99,7 +132,7 @@ func JoinRoom(ctx context.Context, pool *pgxpool.Pool, id string, session RoomSe
 	defer tx.Rollback(ctx)
 	// Serialize seat claims. The following SELECT gets a fresh read-committed
 	// snapshot after the previous claimant releases this room's row lock.
-	if err := tx.QueryRow(ctx, "SELECT id::text FROM rooms WHERE id = $1 FOR UPDATE", id).Scan(&id); err != nil {
+	if err := lockRoom(ctx, tx, id); err != nil {
 		return Room{}, false, err
 	}
 	room, err := GetRoom(ctx, tx, id, session.ExistingHash)
@@ -113,6 +146,11 @@ func JoinRoom(ctx context.Context, pool *pgxpool.Pool, id string, session RoomSe
 		return Room{}, false, ErrRoomFull
 	}
 	return seatAndCommit(ctx, tx, room, session)
+}
+
+func lockRoom(ctx context.Context, tx pgx.Tx, id string) error {
+	var locked int
+	return tx.QueryRow(ctx, "SELECT 1 FROM rooms WHERE id = $1 FOR UPDATE", id).Scan(&locked)
 }
 
 func seatAndCommit(ctx context.Context, tx pgx.Tx, room Room, session RoomSession) (Room, bool, error) {

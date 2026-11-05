@@ -16,6 +16,9 @@ var guestSessionMigration string
 //go:embed migrations/002_rooms.sql
 var roomMigration string
 
+//go:embed migrations/003_games.sql
+var gameMigration string
+
 func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(url)
 	if err != nil {
@@ -52,6 +55,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}{
 		{1, guestSessionMigration},
 		{2, roomMigration},
+		{3, gameMigration},
 	} {
 		var applied bool
 		if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)", migration.version).Scan(&applied); err != nil {
@@ -72,7 +76,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 
 func CheckSchema(ctx context.Context, pool *pgxpool.Pool) error {
 	_, err := pool.Exec(ctx, `
-		SELECT p.id, p.display_name, s.token_hash, s.expires_at, r.id, seat.number
+		SELECT p.id, p.display_name, s.token_hash, s.expires_at, r.id, r.game_revision, r.game_state, seat.number
 		FROM players p JOIN sessions s ON s.player_id = p.id
 		JOIN room_seats seat ON seat.player_id = p.id JOIN rooms r ON r.id = seat.room_id
 		LIMIT 0`)
