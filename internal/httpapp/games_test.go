@@ -55,12 +55,17 @@ func TestGameThroughHTTP(t *testing.T) {
 	readRoom(joined)
 	players := [2]*http.Cookie{host, joined.Result().Cookies()[0]}
 	stranger := sendRequest(handler, "POST", "/api/rooms", "{}", nil).Result().Cookies()[0]
-	if got := sendRequest(handler, "POST", url+"/start", "{}", stranger); got.Code != http.StatusForbidden {
-		t.Fatalf("outsider start: %d", got.Code)
+	for _, cookie := range []*http.Cookie{nil, stranger, players[1]} {
+		if got := sendRequest(handler, "POST", url+"/start", "{}", cookie); got.Code != http.StatusForbidden {
+			t.Fatalf("non-host start: %d", got.Code)
+		}
+	}
+	if got := readRoom(sendRequest(handler, "GET", url, "", host)); got.Game != nil {
+		t.Fatal("a non-host started the game")
 	}
 	start := make(chan *httptest.ResponseRecorder, 2)
-	for _, player := range players {
-		go func() { start <- sendRequest(handler, "POST", url+"/start", "{}", player) }()
+	for range 2 {
+		go func() { start <- sendRequest(handler, "POST", url+"/start", "{}", host) }()
 	}
 	room = readRoom(<-start)
 	second := readRoom(<-start)
@@ -106,6 +111,12 @@ func TestGameThroughHTTP(t *testing.T) {
 	}
 	if applied != 1 || conflicts != 1 || position.Revision != 2 {
 		t.Fatalf("duplicate move applied %d times, %d conflicts, revision %d", applied, conflicts, position.Revision)
+	}
+	if got := sendRequest(handler, "POST", url+"/start", "{}", players[1]); got.Code != http.StatusForbidden {
+		t.Fatalf("non-host start during play: %d", got.Code)
+	}
+	if got := readRoom(sendRequest(handler, "POST", url+"/start", "{}", host)); !reflect.DeepEqual(got.Game, position) {
+		t.Fatal("a repeated host start reset a game in progress")
 	}
 	pool.Close()
 	handler = New(openTestDB(t, dsn), dist, true)

@@ -1,6 +1,6 @@
 # Azul with Friends
 
-A two-player browser adaptation of Azul built with Go, React, TypeScript and PostgreSQL. Create a **Link only** room for a friend, choose **Public lobby** to offer the second seat, or join an open seat directly from the lobby. Either seated player can choose **Start game**. Guests can use either flow without signing in or choosing a display name. [Play Azul with Friends](https://azulwithfriends.com)
+A two-player browser adaptation of Azul built with Go, React, TypeScript and PostgreSQL. Create a **Link only** room and share the invitation, or choose **Public lobby** to offer the second seat. Opening an invitation automatically takes the open seat. Guests can also join directly from the lobby. Once both players are seated, the host can choose **Start game**. Both flows work without signing in or choosing a display name. [Play Azul with Friends](https://azulwithfriends.com)
 
 The game uses the standard colored wall. The server randomly selects the first player. On your turn, select a color from one factory or the center, then choose a highlighted pattern line or the floor. Both boards score automatically after each round. Completing a wall row triggers final scoring at the end of that round. To play again, create a new room. [Publisher’s rulebook](https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf)
 

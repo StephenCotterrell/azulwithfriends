@@ -10,14 +10,15 @@ import (
 )
 
 var (
-	ErrNoSeat      = errors.New("Join this room to play.")
-	ErrNeedPlayers = errors.New("Both seats must be filled before starting.")
-	ErrNotStarted  = errors.New("Start the game before drafting tiles.")
-	ErrStaleMove   = errors.New("The board has changed. Choose your move on the current board.")
-	ErrIllegalMove = errors.New("That move is unavailable. Check whose turn it is and choose a legal move.")
+	ErrNoSeat            = errors.New("Join this room to play.")
+	ErrStartRequiresHost = errors.New("Only the room host can start the game.")
+	ErrNeedPlayers       = errors.New("Both seats must be filled before starting.")
+	ErrNotStarted        = errors.New("Start the game before drafting tiles.")
+	ErrStaleMove         = errors.New("The board has changed. Choose your move on the current board.")
+	ErrIllegalMove       = errors.New("That move is unavailable. Check whose turn it is and choose a legal move.")
 )
 
-// StartGame is safe to repeat, including after the last round.
+// StartGame is safe for the host to repeat, including after the last round.
 func StartGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash []byte) (Room, error) {
 	return changeGame(ctx, pool, id, sessionHash, 0, nil)
 }
@@ -49,6 +50,9 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 		return Room{}, ErrNoSeat
 	}
 	if move == nil {
+		if snapshot.room.YourSeat != 1 {
+			return Room{}, ErrStartRequiresHost
+		}
 		if snapshot.state != nil {
 			return snapshot.publicRoom(), nil
 		}

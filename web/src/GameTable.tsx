@@ -13,13 +13,17 @@ function TilePatterns() {
       <symbol id="motif-red" viewBox="0 0 32 32"><path fill="none" stroke="currentColor" strokeWidth="2.2" d="m16 4 12 12-12 12L4 16Z"/><path fill="currentColor" d="m16 10 6 6-6 6-6-6Z"/></symbol>
       <symbol id="motif-black" viewBox="0 0 32 32"><path fill="none" stroke="currentColor" strokeWidth="2.5" d="m5 13 8-8M5 22 17 10m-7 17 12-12m-3 12 8-8M17 5l10 10M8 14l10 10"/></symbol>
       <symbol id="motif-white" viewBox="0 0 32 32"><g fill="none" stroke="currentColor" strokeWidth="2"><circle cx="16" cy="16" r="10"/><circle cx="16" cy="16" r="5"/><path d="M16 2v5m14 9h-5m-9 14v-5M2 16h5"/></g></symbol>
+      <symbol id="motif-first" viewBox="0 0 32 32">
+        <path d="M4 10V4h6m12 0h6v6m0 12v6h-6m-12 0H4v-6" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+        <text x="16" y="24" textAnchor="middle" fill="currentColor" fontFamily="Georgia, serif" fontSize="24" fontWeight="700">1</text>
+      </symbol>
     </defs>
   </svg>;
 }
 
 function Ceramic({ color, ghost = false, preview = false }: { color?: Tile; ghost?: boolean; preview?: boolean }) {
   return <span aria-hidden="true" className={`ceramic ${color ?? "blank"}${ghost ? " ghost" : ""}${preview ? " preview" : ""}`}>
-    {color === "first" ? "1" : color && <svg focusable="false" viewBox="0 0 32 32"><use href={`#motif-${color}`}/></svg>}
+    {color && <svg focusable="false" viewBox="0 0 32 32"><use href={`#motif-${color}`}/></svg>}
   </span>;
 }
 
@@ -42,15 +46,14 @@ function Supply({ game, active, selected, onPick }: {
   }
   return <section className="supply" aria-label="Drafting area">
     <div className="factory-rack">{game.factories.map((tiles, index) =>
-      <div className="factory" key={index}>
-        <div className="plate">{tiles.length ? tiles.map((color, slot) => draftButton(index + 1, color, tiles, slot)) : <span className="empty-plate">Empty</span>}</div>
-        <h3>{sourceName(index + 1)}</h3>
+      <div className="plate" key={index} role="group" aria-label={`${sourceName(index + 1)}${tiles.length ? "" : ", empty"}`}>
+        {tiles.map((color, slot) => draftButton(index + 1, color, tiles, slot))}
       </div>
     )}</div>
     <div className="table-center">
       <h3>Center</h3>
       <div className="center-groups">
-        {game.markerInCenter && <span className="first-marker" title="Take the first-player marker with the first center draft" aria-label="First-player marker"><Ceramic color="first" /></span>}
+        {game.markerInCenter && <span className="first-marker" role="img" aria-label="First-player marker" title="The first center draft takes this marker"><Ceramic color="first" /></span>}
         {colors.filter(color => game.center.includes(color)).map(color => draftButton(0, color, game.center, 0))}
         {!game.center.length && !game.markerInCenter && <span className="empty-plate">Empty</span>}
       </div>
@@ -70,14 +73,13 @@ function PlayerBoard({ player, seat, own, name, selected, legalMoves, onPlace, p
       <p className="points"><strong>{player.score}</strong> pts</p>
     </header>
     <div className="board-grid">
-      <h3 className="board-heading pattern-heading">Pattern lines</h3><h3 className="board-heading">Wall</h3>
       {player.lines.map((line, index) => {
         const row = index + 1;
         const enabled = allowed(row);
         const capacity = row - line.count;
         const overflow = enabled ? Math.max(0, selected!.count - capacity) : 0;
         const projected = enabled ? Math.min(capacity, selected!.count) : 0;
-        const description = `Line ${row}, ${line.count} of ${row}${line.color ? " " + line.color : ""}`;
+        const description = `Pattern line ${row}, ${line.count} of ${row}${line.color ? " " + line.color : ""}`;
         const slots = Array.from({ length: row }, (_, col) => {
           const filled = col >= capacity;
           const preview = !filled && col >= capacity - projected;
@@ -86,10 +88,10 @@ function PlayerBoard({ player, seat, own, name, selected, legalMoves, onPlace, p
         const wall = player.wall[index];
         return <div key={row} className="board-row">
           {own ? <button type="button" className="pattern-row" data-row={row} disabled={!enabled}
-            aria-label={enabled ? `Place on line ${row}, ${overflow} overflow to floor` : description} onClick={() => onPlace(row)}>
+            aria-label={enabled ? `Place on pattern line ${row}${overflow ? `, ${overflow} overflow to floor` : ""}` : description} onClick={() => onPlace(row)}>
             <span className="row-note">{overflow ? `+${overflow} ↓` : row}</span>{slots}
           </button> : <div className="pattern-row" role="img" aria-label={description}><span className="row-note">{row}</span>{slots}</div>}
-          <div className="wall-row" aria-label={`Wall row ${row}`}>
+          <div className="wall-row" role="group" aria-label={`Wall row ${row}`}>
             {wall.map((filled, col) => {
               const color = colors[(col - index + 5) % 5];
               return <span key={col} role="img" aria-label={`${color}, ${filled ? "filled" : "empty"}`}><Ceramic color={color} ghost={!filled} /></span>;
@@ -102,7 +104,7 @@ function PlayerBoard({ player, seat, own, name, selected, legalMoves, onPlace, p
       {own && selected && <button type="button" className="floor-action" data-row={0} disabled={!allowed(0)} onClick={() => onPlace(0)}>Place on floor</button>}
     </div>
     <ol className="floor" aria-label="Floor penalties">{floorCosts.map((cost, index) =>
-      <li key={index} aria-label={`Floor space ${index + 1}, ${player.floor[index] ?? "empty"}, minus ${cost}`}>
+      <li key={index} aria-label={`Floor space ${index + 1}, ${player.floor[index] === "first" ? "first-player marker" : player.floor[index] ?? "empty"}, minus ${cost}`}>
         <Ceramic color={player.floor[index]} /><span aria-hidden="true">−{cost}</span>
       </li>
     )}</ol>
@@ -151,10 +153,10 @@ export function GameTable({ room, game, busy, onMove }: {
     {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} /> : <>
       <Supply game={game} active={active} selected={selected} onPick={setPick} />
       <div className="draft-help" role="status">{busy ? "Saving your move…" : selected ?
-        <><strong>{selected.count} {selected.color} from {sourceName(selected.source)}</strong> · Choose a highlighted line or the floor.</> :
-        active ? "Choose a color from a factory or the center, then choose a line on your board." : "You can look at both boards while your opponent drafts."}</div>
+        <><strong>{selected.count} {selected.color}</strong> · Choose a line or the floor.</> :
+        active ? "Choose a tile color." : null}</div>
     </>}
-    {game.lastMove && <p className="last-draft"><strong>Last draft</strong> {name(game.lastMove.seat)} took {game.lastMove.count} {game.lastMove.color} from {sourceName(game.lastMove.source)} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</p>}
+    {game.lastMove && <p className="last-draft"><strong>Last draft</strong> {name(game.lastMove.seat)} took {game.lastMove.count} {game.lastMove.color} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</p>}
     <div className="boards">{[room.yourSeat, 3 - room.yourSeat].map(seat =>
       <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
         selected={selected} legalMoves={game.legalMoves} onPlace={place} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} />
