@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { APIError, postJSON, requestJSON, type Room } from "./api";
+import { APIError, inviteURL, postJSON, requestJSON, roomName, roomPath, type Room } from "./api";
 import { GuestPanel } from "./GuestPanel";
 import { GameTable, PlayGuide } from "./GameTable";
 
@@ -64,12 +64,23 @@ export function RoomPage({ id }: { id: string }) {
   const [readError, setReadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [pending, setPending] = useState(false);
+  const [savingListing, setSavingListing] = useState<boolean | null>(null);
   const writing = useRef(false);
   const currentRead = useRef<AbortController | null>(null);
-  const uncertainWrite = useRef<{ action: "join" | "start" | "moves"; revision: number } | null>(null);
+  const uncertainWrite = useRef<{ action: "join" | "start" | "moves" | "listing"; revision: number; listed?: boolean } | null>(null);
   const [revision, setRevision] = useState(0);
   const [paused, setPaused] = useState(false);
   const refresh = () => setRevision(value => value + 1);
+
+  const slug = room?.slug;
+  useEffect(() => {
+    if (!slug) return;
+    document.title = `${roomName(slug)} · Azul with friends`;
+    const canonical = roomPath(slug);
+    if (window.location.pathname !== canonical) {
+      window.history.replaceState(window.history.state, "", canonical + window.location.search + window.location.hash);
+    }
+  }, [slug]);
 
   useEffect(() => {
     if (pending || missing) return;
@@ -92,16 +103,18 @@ export function RoomPage({ id }: { id: string }) {
         const uncertain = uncertainWrite.current;
         if (uncertain) {
           const confirmed = uncertain.action === "join" ? snapshot.yourSeat > 0 :
-            uncertain.action === "start" ? Boolean(snapshot.game) : (snapshot.game?.revision ?? 0) > uncertain.revision;
+            uncertain.action === "start" ? Boolean(snapshot.game) :
+            uncertain.action === "listing" ? snapshot.listed === uncertain.listed : (snapshot.game?.revision ?? 0) > uncertain.revision;
           setActionError(confirmed ? "" : "The room is up to date. You can try again.");
           uncertainWrite.current = null;
         }
         if (snapshot.game?.finished || (snapshot.yourSeat === 0 && snapshot.seats.length === 2)) return;
-        if (!snapshot.game && snapshot.seats.length === 1 && Date.now() >= deadline) {
+        if (!snapshot.game && snapshot.seats.length === 1 && !snapshot.listed && Date.now() >= deadline) {
           setPaused(true);
           return;
         }
         let delay = snapshot.seats.length === 2 && Date.now() < deadline ? 3500 : 7000;
+        if (snapshot.listed && !snapshot.game && Date.now() >= deadline) delay = 20000;
         if (snapshot.game) delay = snapshot.game.turn === snapshot.yourSeat ? 12000 : 2000;
         timer = window.setTimeout(read, delay);
       } catch (cause) {
@@ -132,7 +145,7 @@ export function RoomPage({ id }: { id: string }) {
     };
   }, [path, pending, missing, revision]);
 
-  async function act(action: "join" | "start" | "moves", body: object = {}) {
+  async function act(action: "join" | "start" | "moves" | "listing", body: object = {}) {
     if (writing.current) return;
     writing.current = true;
     currentRead.current?.abort();
@@ -144,7 +157,7 @@ export function RoomPage({ id }: { id: string }) {
       setReadError("");
     } catch (cause) {
       if (!(cause instanceof APIError) || cause.status >= 500) {
-        uncertainWrite.current = { action, revision: room?.game?.revision ?? 0 };
+        uncertainWrite.current = { action, revision: room?.game?.revision ?? 0, listed: action === "listing" ? !room?.listed : undefined };
         setActionError("Checking the latest room state…");
       } else {
         setActionError(cause instanceof Error ? cause.message : "Couldn’t update this room. Try again.");
@@ -158,14 +171,16 @@ export function RoomPage({ id }: { id: string }) {
 
   const full = room?.seats.length === 2;
   const seated = Boolean(room?.yourSeat);
-  const title = missing ? "Room not found" : "Room for two";
+  const title = missing ? "Room not found" : room ? roomName(room.slug) : "Room for two";
   const status = seated
-    ? (full ? "Both players are here. Either of you can start the game." : "Send the link to a friend to fill the other seat.")
+    ? (full ? "Both players are here. Either of you can start the game." : room?.listed ? "Your open seat is in the public lobby. You can also invite a friend." : "Send the link to a friend to fill the other seat.")
     : (full ? "Both seats are taken." : "There’s a seat for you at this table.");
 
   return (
     <main className={room?.game ? "room-page playing" : "room-page"}>
-      <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a></header>
+      <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
+        {room?.game && <span className="room-header-name">{roomName(room.slug)}</span>}
+      </header>
       {actionError && <p className="game-error" role="alert">{actionError}</p>}
       {readError && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>}
       {room?.game ? <>
@@ -173,7 +188,7 @@ export function RoomPage({ id }: { id: string }) {
         <div className="game-tools">
           <PlayGuide />
           <details className="room-settings"><summary>Room and invite</summary>
-            <InviteLink url={new URL(`/r/${room.id}`, window.location.origin).href} />
+            <InviteLink url={inviteURL(room.slug)} />
             <GuestPanel onSaved={refresh} />
           </details>
           <button type="button" className="text-button" onClick={refresh}>Refresh table</button>
@@ -187,7 +202,16 @@ export function RoomPage({ id }: { id: string }) {
             <p className="intro" role="status">{status}</p>
             {seated ? <>
               {full && <button type="button" className="start-game" onClick={() => void act("start")} disabled={pending}>{pending ? "Starting…" : "Start game"}</button>}
-              <InviteLink url={new URL(`/r/${room.id}`, window.location.origin).href} />
+              <InviteLink url={inviteURL(room.slug)} />
+              {room.yourSeat === 1 && !full && <div className="listing-control">
+                <label><input type="checkbox" checked={savingListing ?? room.listed} disabled={pending}
+                  onChange={event => {
+                    const listed = event.target.checked;
+                    setSavingListing(listed);
+                    void act("listing", { listed }).finally(() => setSavingListing(null));
+                  }} />List in public lobby</label>
+                <p className="hint">Offer your open seat for one hour.</p>
+              </div>}
               <GuestPanel onSaved={refresh} />
             </> : full ? <a href="/">Create your own room</a> :
               <button type="button" onClick={() => void act("join")} disabled={pending}>{pending ? "Joining…" : "Join room"}</button>}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/StephenCotterrell/azulwithfriends/internal/game"
@@ -17,6 +18,8 @@ var ErrRoomFull = errors.New("room is full")
 
 type Room struct {
 	ID       string    `json:"id"`
+	Slug     string    `json:"slug"`
+	Listed   bool      `json:"listed"`
 	Seats    []Seat    `json:"seats"`
 	YourSeat int       `json:"yourSeat"`
 	Game     *RoomGame `json:"game"`
@@ -73,26 +76,36 @@ func (s roomSnapshot) publicRoom() Room {
 	return s.room
 }
 
-func readRoom(ctx context.Context, db roomReader, id string, sessionHash []byte) (roomSnapshot, error) {
+// Both lookups use a unique index. Legacy UUIDs have four hyphens, whereas
+// the four-word room name has three. HTTP validates keys before calling here.
+func roomKeyColumn(key string) string {
+	if strings.Count(key, "-") == 4 {
+		return "r.id"
+	}
+	return "r.slug"
+}
+
+func readRoom(ctx context.Context, db roomReader, key string, sessionHash []byte) (roomSnapshot, error) {
 	rows, err := db.Query(ctx, `
-		SELECT seat.number, p.display_name, s.player_id IS NOT NULL, r.game_revision,
+		SELECT r.id::text, r.slug, COALESCE(`+listingActive+`, false),
+		       seat.number, p.display_name, s.player_id IS NOT NULL, r.game_revision,
 		       CASE WHEN s.player_id IS NOT NULL THEN r.game_state END
 		FROM room_seats seat
 		JOIN rooms r ON r.id = seat.room_id
 		JOIN players p ON p.id = seat.player_id
 		LEFT JOIN sessions s ON s.player_id = p.id AND s.token_hash = $2 AND s.expires_at > now()
-		WHERE seat.room_id = $1 ORDER BY seat.number`, id, sessionHash)
+		WHERE `+roomKeyColumn(key)+` = $1 ORDER BY seat.number`, key, sessionHash)
 	if err != nil {
 		return roomSnapshot{}, err
 	}
 	defer rows.Close()
-	snapshot := roomSnapshot{room: Room{ID: id}}
+	var snapshot roomSnapshot
 	for rows.Next() {
 		var number int
 		var name string
 		var ownsSeat bool
 		var state *game.State
-		if err := rows.Scan(&number, &name, &ownsSeat, &snapshot.revision, &state); err != nil {
+		if err := rows.Scan(&snapshot.room.ID, &snapshot.room.Slug, &snapshot.room.Listed, &number, &name, &ownsSeat, &snapshot.revision, &state); err != nil {
 			return roomSnapshot{}, err
 		}
 		snapshot.room.Seats = append(snapshot.room.Seats, seatLabel(number, name))
@@ -108,23 +121,28 @@ func readRoom(ctx context.Context, db roomReader, id string, sessionHash []byte)
 	if len(snapshot.room.Seats) == 0 {
 		return roomSnapshot{}, pgx.ErrNoRows
 	}
+	if len(snapshot.room.Seats) == roomCapacity || snapshot.revision != 0 {
+		snapshot.room.Listed = false
+	}
 	return snapshot, nil
 }
 
-func CreateRoom(ctx context.Context, pool *pgxpool.Pool, session RoomSession) (Room, bool, error) {
+func CreateRoom(ctx context.Context, pool *pgxpool.Pool, session RoomSession, listed bool) (Room, bool, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return Room{}, false, err
 	}
 	defer tx.Rollback(ctx)
-	var room Room
-	if err := tx.QueryRow(ctx, "INSERT INTO rooms DEFAULT VALUES RETURNING id::text").Scan(&room.ID); err != nil {
+	room := Room{Listed: listed}
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO rooms (listed_at) VALUES (CASE WHEN $1::boolean THEN statement_timestamp() END)
+		RETURNING id::text, slug`, listed).Scan(&room.ID, &room.Slug); err != nil {
 		return Room{}, false, err
 	}
 	return seatAndCommit(ctx, tx, room, session)
 }
 
-func JoinRoom(ctx context.Context, pool *pgxpool.Pool, id string, session RoomSession) (Room, bool, error) {
+func JoinRoom(ctx context.Context, pool *pgxpool.Pool, id string, session RoomSession, fromLobby bool) (Room, bool, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return Room{}, false, err
@@ -145,12 +163,15 @@ func JoinRoom(ctx context.Context, pool *pgxpool.Pool, id string, session RoomSe
 	if len(room.Seats) >= roomCapacity {
 		return Room{}, false, ErrRoomFull
 	}
+	if fromLobby && !room.Listed {
+		return Room{}, false, ErrNotListed
+	}
 	return seatAndCommit(ctx, tx, room, session)
 }
 
 func lockRoom(ctx context.Context, tx pgx.Tx, id string) error {
 	var locked int
-	return tx.QueryRow(ctx, "SELECT 1 FROM rooms WHERE id = $1 FOR UPDATE", id).Scan(&locked)
+	return tx.QueryRow(ctx, "SELECT 1 FROM rooms r WHERE "+roomKeyColumn(id)+" = $1 FOR UPDATE", id).Scan(&locked)
 }
 
 func seatAndCommit(ctx context.Context, tx pgx.Tx, room Room, session RoomSession) (Room, bool, error) {
@@ -178,5 +199,8 @@ func seatAndCommit(ctx context.Context, tx pgx.Tx, room Room, session RoomSessio
 		return Room{}, false, err
 	}
 	room.Seats = append(room.Seats, seatLabel(room.YourSeat, player.DisplayName))
+	if len(room.Seats) == roomCapacity {
+		room.Listed = false
+	}
 	return room, newSession, nil
 }

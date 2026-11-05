@@ -19,10 +19,11 @@ func TestRoomLinksAndInvalidRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 	handler := New(nil, dist, true)
-	for _, path := range []string{"/r/bad-link", "/r/bad-link/"} {
+	for _, path := range []string{"/r/bad-link", "/r/bad-link/", "/room/quiet-blue-tile-table", "/room/quiet-blue-tile-table/"} {
 		invite := sendRequest(handler, "GET", path, "", nil)
 		if invite.Code != 200 || !strings.Contains(invite.Body.String(), "<title>Room</title>") ||
-			invite.Header().Get("Referrer-Policy") != "no-referrer" || len(invite.Result().Cookies()) != 0 {
+			invite.Header().Get("Referrer-Policy") != "no-referrer" || invite.Header().Get("X-Robots-Tag") != "noindex, nofollow" ||
+			len(invite.Result().Cookies()) != 0 {
 			t.Errorf("GET %s should serve the private link's shell without creating a guest", path)
 		}
 	}
@@ -41,7 +42,15 @@ func TestRoomLinksAndInvalidRequests(t *testing.T) {
 		{"/api/rooms", "", "", "text/plain", 415},
 		{"/api/rooms", "null", "", "application/json", 400},
 		{"/api/rooms", `{"yourSeat":1}`, "", "application/json", 400},
+		{"/api/rooms", `{"listed":null}`, "", "application/json", 400},
+		{"/api/rooms", `{"listed":"true"}`, "", "application/json", 400},
+		{"/api/rooms", `{"fromLobby":true}`, "", "application/json", 400},
 		{"/api/rooms/not-a-uuid/join", "{}", "", "application/json", 404},
+		{"/api/rooms/quiet-blue-tile-table/join", `{"listed":true}`, "", "application/json", 400},
+		{"/api/rooms/quiet-blue-tile-table/join", `{"fromLobby":true}`, "https://other.example", "application/json", 403},
+		{"/api/rooms/quiet-blue-tile-table/listing", `{"listed":true}`, "https://other.example", "application/json", 403},
+		{"/api/rooms/quiet-blue-tile-table/listing", "{}", "", "application/json", 400},
+		{"/api/rooms/quiet-blue-tile-table/listing", `{"listed":null}`, "", "application/json", 400},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/start", "{}", "https://other.example", "application/json", 403},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/start", "null", "", "application/json", 400},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/moves", `{"revision":1,"color":"red","row":0}`, "", "application/json", 400},
@@ -73,6 +82,8 @@ func TestAnonymousRoomInvitation(t *testing.T) {
 	}
 	type view struct {
 		ID       string          `json:"id"`
+		Slug     string          `json:"slug"`
+		Listed   bool            `json:"listed"`
 		Seats    []seat          `json:"seats"`
 		YourSeat int             `json:"yourSeat"`
 		Game     json.RawMessage `json:"game"`
@@ -83,7 +94,8 @@ func TestAnonymousRoomInvitation(t *testing.T) {
 		decoder := json.NewDecoder(rec.Body)
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&v); err != nil || rec.Code != status || v.YourSeat != yourSeat ||
-			!roomIDPattern.MatchString(v.ID) || !slices.Equal(v.Seats, wantSeats) || string(v.Game) != "null" ||
+			!roomIDPattern.MatchString(v.ID) || !roomSlugPattern.MatchString(v.Slug) || v.Listed ||
+			!slices.Equal(v.Seats, wantSeats) || string(v.Game) != "null" ||
 			rec.Header().Get("Cache-Control") != "no-store" {
 			t.Fatalf("got %d, %+v, error %v; want %d, seat %d, roster %+v", rec.Code, v, err, status, yourSeat, wantSeats)
 		}
@@ -104,7 +116,7 @@ func TestAnonymousRoomInvitation(t *testing.T) {
 	room := readView(created, 201, 1, first)
 	host := guestCookie(created)
 	api := "/api/rooms/" + room.ID
-	if created.Header().Get("Location") != "/r/"+room.ID {
+	if created.Header().Get("Location") != "/room/"+room.Slug {
 		t.Fatal("missing shareable room URL")
 	}
 	preview := send("GET", api, "", nil)

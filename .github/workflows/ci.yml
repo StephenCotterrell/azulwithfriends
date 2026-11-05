@@ -47,6 +47,11 @@ jobs:
           curl --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 http://127.0.0.1:8080/healthz
           curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8080/
           curl --fail --silent --show-error http://127.0.0.1:8080/api/me | jq -e 'has("player") and .player == null'
-          room_id=$(curl -fsS -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8080/api/rooms | jq -er 'select(.yourSeat == 1) | .id')
+          room=$(curl -fsS -H 'Content-Type: application/json' -d '{"listed":true}' http://127.0.0.1:8080/api/rooms)
+          slug=$(jq -er 'select(.yourSeat == 1 and .listed) | .slug' <<< "$room")
+          room_id=$(jq -er '.id' <<< "$room")
           curl -fsS "http://127.0.0.1:8080/r/$room_id" | grep -F '<div id="root">'
-          curl -fsS "http://127.0.0.1:8080/api/rooms/$room_id" | jq -e '.yourSeat == 0 and (.seats | length) == 1'
+          curl -fsS "http://127.0.0.1:8080/room/$slug" | grep -F '<div id="root">'
+          curl -fsS http://127.0.0.1:8080/api/lobby | jq -e --arg slug "$slug" 'any(.rooms[]; .slug == $slug)'
+          curl -fsS -H 'Content-Type: application/json' -d '{"fromLobby":true}' "http://127.0.0.1:8080/api/rooms/$slug/join" | jq -e '.yourSeat == 2'
+          curl -fsS http://127.0.0.1:8080/api/lobby | jq -e '.rooms == []'

@@ -1,33 +1,61 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { GuestPanel } from "./GuestPanel";
+import { Lobby } from "./Lobby";
 import { RoomPage } from "./RoomPage";
-import { postJSON, type Room } from "./api";
+import { APIError, postJSON, requestJSON, roomPath, type Room } from "./api";
 import "./styles.css";
 
 function Welcome() {
-  const [creating, setCreating] = useState(false);
+  const [listed, setListed] = useState(false);
+  const [entering, setEntering] = useState<string | null>(null);
   const [savingName, setSavingName] = useState(false);
-  const [error, setError] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [joinError, setJoinError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const busy = entering !== null || savingName;
 
   useEffect(() => {
     function onShow(event: PageTransitionEvent) {
-      if (event.persisted) setCreating(false);
+      if (event.persisted) setEntering(null);
     }
     window.addEventListener("pageshow", onShow);
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
   async function createRoom() {
-    if (creating || savingName) return;
-    setCreating(true);
-    setError("");
+    if (busy) return;
+    setEntering("create");
+    setCreateError("");
     try {
-      const room = await postJSON<Room>("/api/rooms");
-      window.location.assign(`/r/${encodeURIComponent(room.id)}`);
+      const room = await postJSON<Room>("/api/rooms", { listed });
+      window.location.assign(roomPath(room.slug));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Couldn’t create the room. Try again.");
-      setCreating(false);
+      setCreateError(cause instanceof Error ? cause.message : "Couldn’t create the room. Try again.");
+      setEntering(null);
+    }
+  }
+
+  async function joinRoom(slug: string) {
+    if (busy) return;
+    setEntering(slug);
+    setJoinError("");
+    const path = `/api/rooms/${encodeURIComponent(slug)}`;
+    try {
+      await postJSON<Room>(`${path}/join`, { fromLobby: true });
+      window.location.assign(roomPath(slug));
+    } catch (cause) {
+      if (!(cause instanceof APIError) || cause.status >= 500) {
+        // If the reply was lost after joining, recover the seat without posting twice.
+        const latest = await requestJSON<Room>(path).catch(() => null);
+        if (latest?.yourSeat) {
+          window.location.assign(roomPath(slug));
+          return;
+        }
+      }
+      setJoinError(cause instanceof Error ? cause.message : "Couldn’t join the room. Try again.");
+      setRefreshKey(value => value + 1);
+      setEntering(null);
     }
   }
 
@@ -40,19 +68,25 @@ function Welcome() {
         </div>
         <h1>Azul <em>with friends</em></h1>
         <div className="entry-panel">
-          <p className="intro">Open a room for two and invite a friend with a link.</p>
-          <button type="button" onClick={createRoom} disabled={creating || savingName}>{creating ? "Creating room…" : "Create a room"}</button>
-          {error && <p className="error" role="alert">{error}</p>}
-          <GuestPanel disabled={creating} onSaving={setSavingName} />
+          <p className="intro">Invite a friend to your table or take an open seat.</p>
+          <fieldset className="room-visibility" disabled={busy}>
+            <legend>Room visibility</legend>
+            <div className="visibility-options">
+              <label><input type="radio" name="visibility" checked={!listed} onChange={() => setListed(false)} />Link only</label>
+              <label><input type="radio" name="visibility" checked={listed} onChange={() => setListed(true)} />Public lobby</label>
+            </div>
+          </fieldset>
+          <p className="hint visibility-hint">{listed ? "Offer your open seat in the lobby for one hour." : "Anyone with your invitation link can join."}</p>
+          <button type="button" onClick={createRoom} disabled={busy}>{entering === "create" ? "Creating room…" : "Create a room"}</button>
+          {createError && <p className="error" role="alert">{createError}</p>}
+          <GuestPanel disabled={entering !== null} onSaving={setSavingName} onSaved={() => setRefreshKey(value => value + 1)} />
         </div>
       </div>
-      <div className="tile-panel" aria-hidden="true">
-        <img src="/courtyard.svg" alt="" width="620" height="660" />
-      </div>
+      <Lobby entering={entering} disabled={busy} joinError={joinError} refreshKey={refreshKey} onJoin={joinRoom} />
     </main>
   );
 }
 
-const roomPath = /^\/r\/([^/]+)\/?$/.exec(window.location.pathname);
-if (roomPath) document.title = "Room · Azul with friends";
-createRoot(document.getElementById("root")!).render(roomPath ? <RoomPage id={roomPath[1]} /> : <Welcome />);
+const route = /^\/(?:r|room)\/([^/]+)\/?$/.exec(window.location.pathname);
+if (route) document.title = "Room · Azul with friends";
+createRoot(document.getElementById("root")!).render(route ? <RoomPage id={route[1]} /> : <Welcome />);

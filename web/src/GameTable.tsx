@@ -28,23 +28,22 @@ type Pick = { source: number; color: Color; count: number; revision: number };
 function Supply({ game, active, selected, onPick }: {
   game: Game; active: boolean; selected: Pick | null; onPick: (pick: Pick) => void;
 }) {
-  function groups(tiles: Color[], source: number) {
-    return colors.map(color => {
-      const count = tiles.filter(tile => tile === color).length;
-      if (!count) return null;
-      return <button key={color} type="button" className="tile-group" data-source={source} data-color={color}
-        aria-label={`Take ${count} ${color} from ${sourceName(source)}`}
-        aria-pressed={selected?.source === source && selected.color === color}
-        disabled={!active} onClick={() => onPick({ source, color, count, revision: game.revision })}>
-        <Ceramic color={color} />
-        {count > 1 && <span className="tile-quantity" aria-hidden="true">×{count}</span>}
-      </button>;
-    });
+  function draftButton(source: number, color: Color, tiles: Color[], index: number) {
+    const count = tiles.filter(tile => tile === color).length;
+    // Each factory tile is clickable. Matching tiles share one keyboard stop.
+    const duplicate = source !== 0 && tiles.indexOf(color) !== index;
+    return <button key={source === 0 ? color : index} type="button" className="tile-group" data-source={source} data-color={color}
+      aria-label={`Take ${count} ${color} from ${sourceName(source)}`} tabIndex={duplicate ? -1 : undefined}
+      aria-pressed={selected?.source === source && selected.color === color}
+      disabled={!active} onClick={() => onPick({ source, color, count, revision: game.revision })}>
+      <Ceramic color={color} />
+      {source === 0 && count > 1 && <span className="tile-quantity" aria-hidden="true">×{count}</span>}
+    </button>;
   }
   return <section className="supply" aria-label="Drafting area">
     <div className="factory-rack">{game.factories.map((tiles, index) =>
       <div className="factory" key={index}>
-        <div className="plate">{tiles.length ? groups(tiles, index + 1) : <span className="empty-plate">Empty</span>}</div>
+        <div className="plate">{tiles.length ? tiles.map((color, slot) => draftButton(index + 1, color, tiles, slot)) : <span className="empty-plate">Empty</span>}</div>
         <h3>{sourceName(index + 1)}</h3>
       </div>
     )}</div>
@@ -52,7 +51,7 @@ function Supply({ game, active, selected, onPick }: {
       <h3>Center</h3>
       <div className="center-groups">
         {game.markerInCenter && <span className="first-marker" title="Take the first-player marker with the first center draft" aria-label="First-player marker"><Ceramic color="first" /></span>}
-        {groups(game.center, 0)}
+        {colors.filter(color => game.center.includes(color)).map(color => draftButton(0, color, game.center, 0))}
         {!game.center.length && !game.markerInCenter && <span className="empty-plate">Empty</span>}
       </div>
     </div>

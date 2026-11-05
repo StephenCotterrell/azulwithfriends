@@ -15,7 +15,7 @@ func (a *app) startGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	if !roomIDPattern.MatchString(id) {
+	if !validRoomKey(id) {
 		roomError(w, pgx.ErrNoRows)
 		return
 	}
@@ -44,7 +44,7 @@ func (a *app) playMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	if !roomIDPattern.MatchString(id) {
+	if !validRoomKey(id) {
 		roomError(w, pgx.ErrNoRows)
 		return
 	}
