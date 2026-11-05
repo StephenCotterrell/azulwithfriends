@@ -33,12 +33,7 @@ func (a *app) getRoom(w http.ResponseWriter, r *http.Request) {
 // The create and join routes both claim a seat and issue a guest cookie only
 // after the seat and session have been committed together.
 func (a *app) saveRoom(w http.ResponseWriter, r *http.Request) {
-	var input *struct{}
-	if !a.readJSON(w, r, &input) {
-		return
-	}
-	if input == nil {
-		problem(w, http.StatusBadRequest, "Send an empty JSON object.")
+	if !a.readEmptyObject(w, r) {
 		return
 	}
 	id := r.PathValue("id")
@@ -78,12 +73,29 @@ func (a *app) saveRoom(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, room)
 }
 
+func (a *app) readEmptyObject(w http.ResponseWriter, r *http.Request) bool {
+	var input *struct{}
+	if !a.readJSON(w, r, &input) {
+		return false
+	}
+	if input == nil {
+		problem(w, http.StatusBadRequest, "Send an empty JSON object.")
+		return false
+	}
+	return true
+}
+
 func roomError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		problem(w, http.StatusNotFound, "Room not found. Check the invitation link.")
 	case errors.Is(err, database.ErrRoomFull):
 		problem(w, http.StatusConflict, "Both seats in this room are taken.")
+	case errors.Is(err, database.ErrNoSeat):
+		problem(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, database.ErrNeedPlayers), errors.Is(err, database.ErrNotStarted),
+		errors.Is(err, database.ErrStaleMove), errors.Is(err, database.ErrIllegalMove):
+		problem(w, http.StatusConflict, err.Error())
 	default:
 		slog.Error("room database request failed", "error", err)
 		problem(w, http.StatusServiceUnavailable, "The room is temporarily unavailable. Please try again.")
