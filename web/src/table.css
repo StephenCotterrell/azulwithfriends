@@ -46,6 +46,7 @@
 .player-board { --tile-size: clamp(19px,2.65vw,36px); border: 1px solid var(--line); border-top: 4px solid #a4b8ae; border-radius: 8px; background: var(--paper); padding: 15px clamp(10px,1.8vw,22px) 12px; min-width: 0; }
 .player-board.own { border-top-color: #3f706c; }
 .board-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; margin-bottom: 5px; border-bottom: 1px solid #d6ded5; }
+.board-player { min-width: 0; }
 .board-header h2, .results h2 { margin: 0; font: normal clamp(22px,2.2vw,32px)/1.2 Georgia, serif; color: var(--ink); letter-spacing: -.04em; overflow-wrap: anywhere; }
 .board-header small { font: 600 .72rem system-ui,sans-serif; letter-spacing: 0; margin-left: 1px; color: #43675d; }
 .placement-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; padding: 2px 0 6px; border-bottom: 1px solid #d6ded5; color: #234c54; font-size: .9rem; line-height: 1.4; }
@@ -91,6 +92,41 @@
 .game-error { color: #8a3828; padding: 8px 12px; background: #fff2e5; border-radius: 5px; margin: 10px 0; }
 .start-game { margin-bottom: 23px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.match-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+.match-main { min-width: 0; }
+.match-layout .boards { grid-template-columns: 1fr; }
+.opponent-overview { grid-column: 2; grid-row: 1; position: sticky; top: 12px; z-index: 2; }
+.match-layout .match-main { grid-column: 1; grid-row: 1; }
+.player-board.compact { --tile-size: 19px; padding: 12px; box-shadow: 0 3px 12px #213f5210; }
+.opponent-label { display: block; margin-bottom: 2px; color: #536960; font-size: .67rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.compact .board-header h2 { font-size: 1.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.02em; }
+.compact .points strong { font-size: 1.5rem; }
+.compact .board-grid { column-gap: 10px; }
+.compact .pattern-row { min-height: 23px; padding: 1px 0; }
+.compact .row-note { font-size: .62rem; }
+.compact .ceramic { border-radius: 2px; }
+.compact .floor-caption { min-height: 0; margin-top: 8px; padding-top: 6px; }
+.compact .floor { gap: 5px; }
+@media (max-width: 960px) {
+  .match-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .opponent-overview, .match-layout .match-main { grid-column: 1; grid-row: auto; }
+  .opponent-overview { top: 0; padding-top: 6px; background: #f8f6ef; border-radius: 8px; }
+  .player-board.compact { --tile-size: 13px; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 18px; padding: 7px 10px 9px; }
+  .compact .board-header { grid-column: 1 / -1; padding-bottom: 5px; margin-bottom: 5px; }
+  .compact .board-player { display: flex; align-items: baseline; gap: 8px; }
+  .compact .opponent-label { flex: none; margin: 0; font-size: .6rem; }
+  .compact .board-header h2 { font-size: 1rem; }
+  .compact .points { font-size: .72rem; }
+  .compact .points strong { font-size: 1.15rem; }
+  .compact .board-grid { grid-column: 1; grid-row: 2 / 4; width: 100%; max-width: 240px; justify-self: center; column-gap: 8px; }
+  .compact .pattern-row { min-height: 16px; padding: 0; gap: 1px; }
+  .compact .wall-row { gap: 1px; }
+  .compact .floor-caption { grid-column: 2; grid-row: 2; align-self: end; margin: 0 0 3px; padding: 0; border: 0; }
+  .compact .board-heading { font-size: .65rem; margin: 0; }
+  .compact .floor { grid-column: 2; grid-row: 3; align-self: start; display: grid; grid-template-columns: repeat(4, auto); gap: 3px; margin: 0; }
+  .compact .floor li { font-size: .6rem; line-height: 1.15; }
+  .match-layout :is(.supply, .own, .supply button, .own button) { scroll-margin-top: calc(var(--opponent-height, 150px) + 12px); }
+}
 @media (max-width: 800px) {
   .room-page.playing { width: calc(100% - 36px); }
   .supply { grid-template-columns: 1fr; gap: 9px; }
