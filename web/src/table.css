@@ -1,5 +1,14 @@
 .room-page.playing { max-width: 1192px; width: calc(100% - clamp(32px, 8vw, 120px)); padding-top: 20px; }
 .playing .room-header { padding-bottom: 12px; }
+.room-header:has(.leave-game) .room-header-name { margin-left: auto; }
+.leave-game { font-size: .9rem; padding: 8px 14px; }
+.close-room-dialog { width: min(410px, calc(100% - 32px)); border: 1px solid #a9baad; border-radius: 9px; padding: 24px; background: #fffdf7; color: #233e45; }
+.close-room-dialog::backdrop { background: #152d35a6; }
+.close-room-dialog h2 { margin: 0; font: 400 1.85rem/1.15 Georgia, serif; color: #213f52; }
+.close-room-dialog p { margin: 12px 0; }
+.close-room-dialog .actions { justify-content: flex-end; margin-top: 20px; }
+.confirm-close { background: #8d402f; }
+.confirm-close:hover { background: #743222; }
 .game-table { --ink: #213f52; --line: #c0cbc2; --paper: #fffdf7; }
 .tile-patterns { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 .game-heading { display: flex; gap: 20px; align-items: center; justify-content: space-between; padding: 19px 0 17px; }
@@ -90,6 +99,7 @@
 @media (max-width: 640px) {
   .room-page.playing { width: calc(100% - 24px); padding: 10px 0 32px; }
   .playing .room-header { padding-bottom: 4px; }
+  .room-header:has(.leave-game) .room-header-name { order: 1; width: 100%; padding-bottom: 5px; }
   .game-heading { padding: 14px 0; }
   .turn { font-size: .86rem; }
   .supply { --tile-size: 27px; padding: 9px; }

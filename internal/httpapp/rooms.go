@@ -178,7 +178,8 @@ func roomError(w http.ResponseWriter, err error) {
 	case errors.Is(err, database.ErrNoSeat), errors.Is(err, database.ErrNotHost), errors.Is(err, database.ErrStartRequiresHost):
 		problem(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, database.ErrNotListed), errors.Is(err, database.ErrNeedPlayers), errors.Is(err, database.ErrNotStarted),
-		errors.Is(err, database.ErrStaleMove), errors.Is(err, database.ErrIllegalMove), errors.Is(err, database.ErrGameStarted):
+		errors.Is(err, database.ErrStaleMove), errors.Is(err, database.ErrIllegalMove), errors.Is(err, database.ErrGameStarted),
+		errors.Is(err, database.ErrNeedBotGame):
 		problem(w, http.StatusConflict, err.Error())
 	default:
 		slog.Error("room database request failed", "error", err)

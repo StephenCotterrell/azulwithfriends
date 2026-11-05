@@ -84,6 +84,9 @@ func TestGameThroughHTTP(t *testing.T) {
 	if room.Game == nil || room.Game.Revision != 1 || !reflect.DeepEqual(room.Game, second.Game) {
 		t.Fatal("simultaneous starts must return the same initial position")
 	}
+	if got := sendRequest(handler, "POST", url+"/close", "{}", host); got.Code != http.StatusConflict {
+		t.Fatalf("closing a human game: %d %s", got.Code, got.Body)
+	}
 	for _, cookie := range []*http.Cookie{nil, stranger} {
 		if got := readGameRoom(t, sendRequest(handler, "GET", url, "", cookie)); got.Game != nil || got.YourSeat != 0 {
 			t.Fatal("unseated visitor could inspect a started game")

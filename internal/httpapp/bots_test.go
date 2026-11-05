@@ -3,6 +3,7 @@ package httpapp
 import (
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/StephenCotterrell/azulwithfriends/internal/database/dbtest"
@@ -83,5 +84,59 @@ func TestHostCanPlayABotToCompletion(t *testing.T) {
 	}
 	if !replied || len(position.Winners) == 0 || len(position.LegalMoves) != 0 {
 		t.Fatal("incomplete bot game")
+	}
+	if got := sendRequest(handler, "POST", url+"/close", "{}", host); got.Code != http.StatusOK {
+		t.Fatalf("closing the finished game: %d %s", got.Code, got.Body)
+	}
+}
+
+func TestCloseActiveBotGame(t *testing.T) {
+	pool := openTestDB(t, dbtest.IsolatedDSN(t))
+	handler := New(pool, t.TempDir(), true)
+	created := sendRequest(handler, "POST", "/api/rooms", "{}", nil)
+	room := readGameRoom(t, created)
+	host := created.Result().Cookies()[0]
+	url := "/api/rooms/" + room.ID
+	closeURL := url + "/close"
+	for _, withBot := range []bool{false, true} {
+		if withBot {
+			readGameRoom(t, sendRequest(handler, "POST", url+"/bot", `{"enabled":true}`, host))
+		}
+		if got := sendRequest(handler, "POST", closeURL, "{}", host); got.Code != http.StatusConflict {
+			t.Fatalf("closing a waiting room: %d %s", got.Code, got.Body)
+		}
+	}
+	position := readGameRoom(t, sendRequest(handler, "POST", url+"/start", "{}", host)).Game
+	stranger := sendRequest(handler, "POST", "/api/session", `{"displayName":"Guest"}`, nil).Result().Cookies()[0]
+	for _, cookie := range []*http.Cookie{nil, stranger} {
+		if got := sendRequest(handler, "POST", closeURL, "{}", cookie); got.Code != http.StatusForbidden {
+			t.Fatalf("non-host closing a bot game: %d %s", got.Code, got.Body)
+		}
+	}
+	// A draft already holding the lock can finish first. Once the close
+	// commits, neither a waiting draft nor a retry can recreate the room.
+	draftBody := moveBody(t, position.Revision, position.LegalMoves[0])
+	draftStatus := make(chan int, 1)
+	go func() { draftStatus <- sendRequest(handler, "POST", url+"/moves", draftBody, host).Code }()
+	if got := sendRequest(handler, "POST", closeURL, "{}", host); got.Code != http.StatusOK || strings.TrimSpace(got.Body.String()) != `{"closed":true}` {
+		t.Fatalf("closing active bot game: %d %s", got.Code, got.Body)
+	}
+	if code := <-draftStatus; code != http.StatusOK && code != http.StatusNotFound {
+		t.Fatalf("concurrent draft returned %d", code)
+	}
+	if got := sendRequest(handler, "POST", closeURL, "{}", host); got.Code != http.StatusNotFound {
+		t.Fatalf("retry after closing: %d", got.Code)
+	}
+	if got := sendRequest(handler, "GET", "/api/rooms/"+room.Slug, "", host); got.Code != http.StatusNotFound {
+		t.Fatalf("closed invitation: %d", got.Code)
+	}
+	var seats int
+	if err := pool.QueryRow(t.Context(), "SELECT count(*) FROM room_seats WHERE room_id = $1", room.ID).Scan(&seats); err != nil || seats != 0 {
+		t.Fatalf("remaining seats after close: %d, %v", seats, err)
+	}
+	// The same guest can create a fresh room without receiving a replacement cookie.
+	next := sendRequest(handler, "POST", "/api/rooms", "{}", host)
+	if readGameRoom(t, next).YourSeat != 1 || len(next.Result().Cookies()) != 0 {
+		t.Fatal("closing a room lost the host's guest identity")
 	}
 }

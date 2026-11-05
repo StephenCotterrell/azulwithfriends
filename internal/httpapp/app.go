@@ -53,6 +53,7 @@ func New(db *pgxpool.Pool, dist string, secureCookies bool) http.Handler {
 	mux.HandleFunc("POST /api/rooms/{id}/listing", a.setRoomListing)
 	mux.HandleFunc("POST /api/rooms/{id}/bot", a.setRoomBot)
 	mux.HandleFunc("POST /api/rooms/{id}/start", a.startGame)
+	mux.HandleFunc("POST /api/rooms/{id}/close", a.closeBotGame)
 	mux.HandleFunc("POST /api/rooms/{id}/moves", a.playMove)
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusNotFound, "Unknown API endpoint.")

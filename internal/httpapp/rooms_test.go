@@ -55,6 +55,8 @@ func TestRoomLinksAndInvalidRequests(t *testing.T) {
 		{"/api/rooms/quiet-blue-tile-table/listing", `{"listed":null}`, "", "application/json", 400},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/start", "{}", "https://other.example", "application/json", 403},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/start", "null", "", "application/json", 400},
+		{"/api/rooms/quiet-blue-tile-table/close", "{}", "https://other.example", "application/json", 403},
+		{"/api/rooms/quiet-blue-tile-table/close", `{"yourSeat":1}`, "", "application/json", 400},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/moves", `{"revision":1,"color":"red","row":0}`, "", "application/json", 400},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/moves", `{"revision":1,"color":"red","source":0}`, "", "application/json", 400},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/moves", `{"revision":1,"color":"red","source":0,"row":0,"seat":1}`, "", "application/json", 400},

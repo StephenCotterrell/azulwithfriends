@@ -4,6 +4,8 @@ A two-player browser adaptation of Azul built with Go, React, TypeScript and Pos
 
 The game uses the standard colored wall. The server randomly selects the first player. On your turn, select a color from one factory or the center, then choose a highlighted pattern line or the floor. The bot takes its turns automatically. **Last draft** shows what it picked. Both boards score automatically after each round. Completing a wall row triggers final scoring at the end of that round. To play again, create a new room. [Publisher’s rulebook](https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf)
 
+During a bot match or from its final scores, choose **Leave game**, then **Leave and close room**. This removes the saved game, closes the invitation, and returns you to the lobby.
+
 Rooms have a four-word name and an invitation at `https://azulwithfriends.com/room/<name>`. Link-only rooms are the default. The host can list or unlist an open seat. A public listing lasts one hour and disappears when the second player joins. The invitation continues to work after unlisting or expiry.
 
 A private cookie remembers each player's seat on the original host in that browser for up to 30 days. Earlier UUID invitations still open the same room. If you started a game on the Railway hostname, use its original link to resume your seat there.

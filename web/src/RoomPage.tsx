@@ -9,6 +9,7 @@ function canJoin(room: Room) {
 
 type RoomAction =
   | { name: "join" | "start"; body?: never }
+  | { name: "close"; roomPath: string }
   | { name: "moves"; body: Move & { revision: number } }
   | { name: "listing"; body: { listed: boolean } }
   | { name: "bot"; body: { enabled: boolean } };
@@ -20,11 +21,32 @@ function roomReflectsAction(room: Room, action: RoomAction) {
     case "moves": return (room.game?.revision ?? 0) > action.body.revision;
     case "listing": return room.listed === action.body.listed;
     case "bot": return room.seats.some(seat => seat.isBot) === action.body.enabled;
+    case "close": return false; // A closed room returns 404.
   }
 }
 
 function roomPageVisible() {
   return !document.hidden && !("prerendering" in document && document.prerendering === true);
+}
+
+function CloseRoomDialog({ busy, error, onConfirm, onCancel }: {
+  busy: boolean; error: string; onConfirm: () => void; onCancel: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => { dialog.current?.showModal(); }, []);
+
+  return (
+    <dialog className="close-room-dialog" ref={dialog} aria-labelledby="close-room-heading"
+      aria-describedby="close-room-description" onClose={onCancel} onCancel={event => { if (busy) event.preventDefault(); }}>
+      <h2 id="close-room-heading">Leave and close this room?</h2>
+      <p id="close-room-description">Closing the room permanently removes the game and its scores. You’ll return to the lobby.</p>
+      {error && <p className="game-error" role="alert">{error}</p>}
+      <div className="actions">
+        <button type="button" className="secondary" disabled={busy} autoFocus onClick={() => dialog.current?.close()}>Cancel</button>
+        <button type="button" className="confirm-close" disabled={busy} onClick={onConfirm}>{busy ? "Closing…" : "Leave and close room"}</button>
+      </div>
+    </dialog>
+  );
 }
 
 function InviteLink({ url }: { url: string }) {
@@ -97,6 +119,7 @@ export function RoomPage({ id }: { id: string }) {
   const [actionError, setActionError] = useState("");
   const [retryJoin, setRetryJoin] = useState(false);
   const [pending, setPending] = useState<RoomAction | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
   const writing = useRef(false);
   const triedInvite = useRef(false);
   const currentRead = useRef<AbortController | null>(null);
@@ -130,16 +153,19 @@ export function RoomPage({ id }: { id: string }) {
       const request = new AbortController();
       controller = currentRead.current = request;
       try {
-        const snapshot = await requestJSON<Room>(path, { signal: request.signal });
+        const uncertain = uncertainWrite.current;
+        const lookup = uncertain?.name === "close" ? uncertain.roomPath : path;
+        const snapshot = await requestJSON<Room>(lookup, { signal: request.signal });
         if (request.signal.aborted || !roomPageVisible()) return;
         setRoom(snapshot);
         setReadError("");
-        const uncertain = uncertainWrite.current;
         if (uncertain) {
           const confirmed = roomReflectsAction(snapshot, uncertain);
           if (uncertain.name === "join") {
             setRetryJoin(!confirmed);
             setActionError(confirmed ? "" : "Couldn’t join the room. Try again.");
+          } else if (uncertain.name === "close") {
+            setActionError("This room is still open. Try closing it again.");
           } else {
             setActionError(confirmed ? "" : "The room is up to date. You can try again.");
           }
@@ -163,6 +189,10 @@ export function RoomPage({ id }: { id: string }) {
       } catch (cause) {
         if (request.signal.aborted) return;
         if (cause instanceof APIError && cause.status === 404) {
+          if (uncertainWrite.current?.name === "close") {
+            window.location.replace("/");
+            return;
+          }
           setRoom(null);
           setMissing(true);
         } else {
@@ -197,7 +227,17 @@ export function RoomPage({ id }: { id: string }) {
     setPending(action);
     setActionError("");
     if (action.name === "join") setRetryJoin(false);
+    if (action.name === "close") {
+      uncertainWrite.current = null;
+      setReadError("");
+    }
     try {
+      if (action.name === "close") {
+        const result = await postJSON<{ closed: boolean }>(`${action.roomPath}/close`);
+        if (result.closed !== true) throw new Error("Checking whether the room closed…");
+        window.location.replace("/");
+        return;
+      }
       const updated = await postJSON<Room>(`${path}/${action.name}`, action.body ?? {});
       setRoom(updated);
       setReadError("");
@@ -206,9 +246,9 @@ export function RoomPage({ id }: { id: string }) {
         // Another visitor took the last seat. The refresh below shows the full room.
         return;
       }
-      if (!(cause instanceof APIError) || cause.status >= 500) {
+      if (!(cause instanceof APIError) || cause.status >= 500 || (action.name === "close" && cause.status === 404)) {
         uncertainWrite.current = action;
-        setActionError("Checking the latest room state…");
+        setActionError(action.name === "close" ? "Checking whether the room closed…" : "Checking the latest room state…");
       } else {
         setActionError(cause instanceof Error ? cause.message : "Couldn’t update this room. Try again.");
         if (action.name === "join") setRetryJoin(true);
@@ -224,6 +264,7 @@ export function RoomPage({ id }: { id: string }) {
   const seated = Boolean(room?.yourSeat);
   const host = room?.yourSeat === 1;
   const bot = room?.seats.find(seat => seat.isBot);
+  const closeRoomPath = host && bot && room?.game ? `/api/rooms/${encodeURIComponent(room.id)}` : null;
   const title = missing ? "Room not found" : room ? roomName(room.slug) : "Room for two";
   let status = "";
   if (host && !full) status = room?.listed ? "Waiting for a second player." : "Invite a friend or add a bot to the open seat.";
@@ -236,9 +277,13 @@ export function RoomPage({ id }: { id: string }) {
     <main className={room?.game ? "room-page playing" : "room-page"}>
       <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
         {room?.game && <span className="room-header-name">{roomName(room.slug)}</span>}
+        {closeRoomPath && <button type="button" className="secondary leave-game" disabled={!!pending}
+          onClick={() => { setActionError(""); setConfirmClose(true); }}>Leave game</button>}
       </header>
-      {actionError && <p className="game-error" role="alert">{actionError}</p>}
-      {readError && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>}
+      {confirmClose && closeRoomPath && <CloseRoomDialog busy={pending?.name === "close"} error={readError || actionError}
+        onConfirm={() => void act({ name: "close", roomPath: closeRoomPath })} onCancel={() => { setConfirmClose(false); setActionError(""); }} />}
+      {actionError && !confirmClose && <p className="game-error" role="alert">{actionError}</p>}
+      {readError && !confirmClose && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>}
       {room?.game ? <>
         <GameTable room={room} game={room.game} busy={!!pending} onMove={move => void act({ name: "moves", body: move })} />
         <div className="game-tools">
