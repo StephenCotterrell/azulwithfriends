@@ -1,14 +1,16 @@
 # Azul with Friends
 
-A two-player browser adaptation of Azul built with Go, React, TypeScript and PostgreSQL. Create a **Link only** room and share the invitation, or choose **Public lobby** to offer the second seat. Opening an invitation automatically takes the open seat. Guests can also join directly from the lobby. Once both players are seated, the host can choose **Start game**. Both flows work without signing in or choosing a display name. [Play Azul with Friends](https://azulwithfriends.com)
+A two-player browser adaptation of Azul built with Go, React, TypeScript and PostgreSQL. Create a room and choose **Add bot** to play against the computer. You can remove the bot before starting. To play with another person, share a **Link only** invitation or offer the open seat in the **Public lobby**. Opening an invitation automatically claims an open seat. Guests can also join directly from the lobby. Once both seats are filled, the host chooses **Start game**. You can play as a guest without signing in or choosing a display name. [Play Azul with Friends](https://azulwithfriends.com)
 
-The game uses the standard colored wall. The server randomly selects the first player. On your turn, select a color from one factory or the center, then choose a highlighted pattern line or the floor. Both boards score automatically after each round. Completing a wall row triggers final scoring at the end of that round. To play again, create a new room. [Publisher’s rulebook](https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf)
+The game uses the standard colored wall. The server randomly selects the first player. On your turn, select a color from one factory or the center, then choose a highlighted pattern line or the floor. The bot takes its turns automatically. **Last draft** shows what it picked. Both boards score automatically after each round. Completing a wall row triggers final scoring at the end of that round. To play again, create a new room. [Publisher’s rulebook](https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf)
 
 Rooms have a four-word name and an invitation at `https://azulwithfriends.com/room/<name>`. Link-only rooms are the default. The host can list or unlist an open seat. A public listing lasts one hour and disappears when the second player joins. The invitation continues to work after unlisting or expiry.
 
 A private cookie remembers each player's seat on the original host in that browser for up to 30 days. Earlier UUID invitations still open the same room. If you started a game on the Railway hostname, use its original link to resume your seat there.
 
 Go validates each draft against the current turn and board revision, then commits it to PostgreSQL under a room lock. The saved position includes the bag and shuffle state so a restart can resume mid-round. The browser receives the visible boards, offers, and legal moves.
+
+The bot searches two turns ahead using the visible tiles. It weighs each legal draft against the opponent's strongest reply in the current round, estimating wall points, floor penalties, and progress on unfinished lines. The search follows the minimax approach in [Dom Wilson’s Azul AI](https://domwil.co.uk/posts/azul-ai/).
 
 ## Run locally
 

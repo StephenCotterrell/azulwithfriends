@@ -50,6 +50,8 @@ func TestRoomLinksAndInvalidRequests(t *testing.T) {
 		{"/api/rooms/quiet-blue-tile-table/join", `{"fromLobby":true}`, "https://other.example", "application/json", 403},
 		{"/api/rooms/quiet-blue-tile-table/listing", `{"listed":true}`, "https://other.example", "application/json", 403},
 		{"/api/rooms/quiet-blue-tile-table/listing", "{}", "", "application/json", 400},
+		{"/api/rooms/quiet-blue-tile-table/bot", `{"enabled":true}`, "https://other.example", "application/json", 403},
+		{"/api/rooms/quiet-blue-tile-table/bot", "{}", "", "application/json", 400},
 		{"/api/rooms/quiet-blue-tile-table/listing", `{"listed":null}`, "", "application/json", 400},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/start", "{}", "https://other.example", "application/json", 403},
 		{"/api/rooms/a4682816-f1a3-4d82-9f25-7b7fea55dd28/start", "null", "", "application/json", 400},
@@ -77,6 +79,7 @@ func TestAnonymousRoomInvitation(t *testing.T) {
 	// Limit accepted fields to the public contract; private player IDs and
 	// session tokens must never be serialized into the shared room view.
 	type seat struct {
+		IsBot       bool   `json:"isBot"`
 		Number      int    `json:"number"`
 		DisplayName string `json:"displayName"`
 	}
@@ -112,7 +115,7 @@ func TestAnonymousRoomInvitation(t *testing.T) {
 	}
 
 	created := send("POST", "/api/rooms", "{}", nil)
-	first := seat{1, "Player 1"}
+	first := seat{Number: 1, DisplayName: "Player 1"}
 	room := readView(created, 201, 1, first)
 	host := guestCookie(created)
 	api := "/api/rooms/" + room.ID
@@ -129,7 +132,7 @@ func TestAnonymousRoomInvitation(t *testing.T) {
 		t.Fatalf("unexpected records after invitation preview: %d players, %d sessions, err %v", players, sessions, err)
 	}
 
-	second := seat{2, "Player 2"}
+	second := seat{Number: 2, DisplayName: "Player 2"}
 	joined := send("POST", api+"/join", "{}", nil)
 	readView(joined, 200, 2, first, second)
 	friend := guestCookie(joined)
@@ -154,7 +157,7 @@ func TestAnonymousRoomInvitation(t *testing.T) {
 	}
 	readView(send("GET", api, "", nil), 200, 0, first, second)
 	newRoom := send("POST", "/api/rooms", "{}", friend)
-	readView(newRoom, 201, 1, seat{1, "Lena"})
+	readView(newRoom, 201, 1, seat{Number: 1, DisplayName: "Lena"})
 	if len(newRoom.Result().Cookies()) != 0 {
 		t.Fatal("guest with an existing name shouldn't need a new identity to create a room")
 	}

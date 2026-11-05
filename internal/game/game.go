@@ -212,6 +212,18 @@ func (s *State) Apply(seat int, m Move) error {
 		return errors.New("these tiles cannot go on that pattern line")
 	}
 
+	s.applyDraft(m)
+	if s.offersEmpty() {
+		s.finishRound()
+	}
+	return nil
+}
+
+// applyDraft plays a known legal move. The caller controls when to score and
+// refill so a simulated draft can stop at the end of the visible offers.
+func (s *State) applyDraft(m Move) {
+	seat := s.Turn
+	p := &s.Players[seat-1]
 	picked := s.take(m.Source, m.Color)
 	s.LastMove = &Draft{Move: m, Seat: seat, Count: picked}
 	if m.Source == 0 && s.MarkerInCenter {
@@ -236,10 +248,6 @@ func (s *State) Apply(seat int, m Move) error {
 		}
 	}
 	s.Turn = 3 - seat
-	if s.offersEmpty() {
-		s.finishRound()
-	}
-	return nil
 }
 
 func (s *State) take(source int, color string) int {

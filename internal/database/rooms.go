@@ -33,13 +33,16 @@ type RoomGame struct {
 type Seat struct {
 	Number      int    `json:"number"`
 	DisplayName string `json:"displayName"`
+	IsBot       bool   `json:"isBot"`
 }
 
-func seatLabel(number int, name string) Seat {
-	if name == "" {
+func seatLabel(number int, name string, isBot bool) Seat {
+	if isBot {
+		name = "Azul Bot"
+	} else if name == "" {
 		name = "Player " + strconv.Itoa(number)
 	}
-	return Seat{Number: number, DisplayName: name}
+	return Seat{Number: number, DisplayName: name, IsBot: isBot}
 }
 
 // NewHash identifies a candidate session. The caller issues its cookie only
@@ -88,11 +91,11 @@ func roomKeyColumn(key string) string {
 func readRoom(ctx context.Context, db roomReader, key string, sessionHash []byte) (roomSnapshot, error) {
 	rows, err := db.Query(ctx, `
 		SELECT r.id::text, r.slug, COALESCE(`+listingActive+`, false),
-		       seat.number, p.display_name, s.player_id IS NOT NULL, r.game_revision,
+		       seat.number, COALESCE(p.display_name, ''), seat.is_bot, s.player_id IS NOT NULL, r.game_revision,
 		       CASE WHEN s.player_id IS NOT NULL THEN r.game_state END
 		FROM room_seats seat
 		JOIN rooms r ON r.id = seat.room_id
-		JOIN players p ON p.id = seat.player_id
+		LEFT JOIN players p ON p.id = seat.player_id
 		LEFT JOIN sessions s ON s.player_id = p.id AND s.token_hash = $2 AND s.expires_at > now()
 		WHERE `+roomKeyColumn(key)+` = $1 ORDER BY seat.number`, key, sessionHash)
 	if err != nil {
@@ -103,12 +106,12 @@ func readRoom(ctx context.Context, db roomReader, key string, sessionHash []byte
 	for rows.Next() {
 		var number int
 		var name string
-		var ownsSeat bool
+		var isBot, ownsSeat bool
 		var state *game.State
-		if err := rows.Scan(&snapshot.room.ID, &snapshot.room.Slug, &snapshot.room.Listed, &number, &name, &ownsSeat, &snapshot.revision, &state); err != nil {
+		if err := rows.Scan(&snapshot.room.ID, &snapshot.room.Slug, &snapshot.room.Listed, &number, &name, &isBot, &ownsSeat, &snapshot.revision, &state); err != nil {
 			return roomSnapshot{}, err
 		}
-		snapshot.room.Seats = append(snapshot.room.Seats, seatLabel(number, name))
+		snapshot.room.Seats = append(snapshot.room.Seats, seatLabel(number, name, isBot))
 		if ownsSeat {
 			snapshot.room.YourSeat = number
 			snapshot.state = state
@@ -198,7 +201,7 @@ func seatAndCommit(ctx context.Context, tx pgx.Tx, room Room, session RoomSessio
 	if err := tx.Commit(ctx); err != nil {
 		return Room{}, false, err
 	}
-	room.Seats = append(room.Seats, seatLabel(room.YourSeat, player.DisplayName))
+	room.Seats = append(room.Seats, seatLabel(room.YourSeat, player.DisplayName, false))
 	if len(room.Seats) == roomCapacity {
 		room.Listed = false
 	}
