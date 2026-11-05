@@ -45,7 +45,8 @@ func TestGameThroughHTTP(t *testing.T) {
 	}
 	created := sendRequest(handler, "POST", "/api/rooms", "{}", nil)
 	room := readRoom(created)
-	url := "/api/rooms/" + room.ID
+	url := "/api/rooms/" + room.Slug
+	legacyURL := "/api/rooms/" + room.ID
 	host := created.Result().Cookies()[0]
 	if got := sendRequest(handler, "POST", url+"/start", "{}", host); got.Code != http.StatusConflict {
 		t.Fatalf("one-player start: %d", got.Code)
@@ -109,7 +110,7 @@ func TestGameThroughHTTP(t *testing.T) {
 	pool.Close()
 	handler = New(openTestDB(t, dsn), dist, true)
 	for index, cookie := range players {
-		restored := readRoom(sendRequest(handler, "GET", url, "", cookie))
+		restored := readRoom(sendRequest(handler, "GET", legacyURL, "", cookie))
 		if restored.YourSeat != index+1 || !reflect.DeepEqual(restored.Game, position) {
 			t.Fatal("board or seat changed after reopening the database connection")
 		}

@@ -73,7 +73,7 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 		return Room{}, err
 	}
 	snapshot.revision++
-	if _, err := tx.Exec(ctx, "UPDATE rooms SET game_state = $2::jsonb, game_revision = $3 WHERE id = $1", id, string(encoded), snapshot.revision); err != nil {
+	if _, err := tx.Exec(ctx, "UPDATE rooms SET game_state = $2::jsonb, game_revision = $3 WHERE id = $1", snapshot.room.ID, string(encoded), snapshot.revision); err != nil {
 		return Room{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {

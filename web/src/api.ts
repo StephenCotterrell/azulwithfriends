@@ -32,10 +32,30 @@ export function postJSON<T>(path: string, body: object = {}): Promise<T> {
 
 export type Room = {
   id: string;
+  slug: string;
+  listed: boolean;
   seats: { number: number; displayName: string }[];
   yourSeat: number;
   game: Game | null;
 };
+
+export type LobbyRoom = { slug: string; hostName: string; isHost: boolean };
+
+export function roomPath(slug: string) {
+  return `/room/${encodeURIComponent(slug)}`;
+}
+
+export function roomName(slug: string) {
+  return slug.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
+export function inviteURL(slug: string) {
+  // A player on the old Railway host stays there to keep their guest cookie.
+  // Invitations opened by a friend can use the public domain.
+  const deployed = ["azulwithfriends.com", "www.azulwithfriends.com", "azulwithfriends-production.up.railway.app"];
+  const origin = deployed.includes(window.location.hostname) ? "https://azulwithfriends.com" : window.location.origin;
+  return new URL(roomPath(slug), origin).href;
+}
 
 export const colors = ["blue", "yellow", "red", "black", "white"] as const;
 export type Color = typeof colors[number];

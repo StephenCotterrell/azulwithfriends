@@ -79,14 +79,14 @@ func TestUpgradePreservesExistingGuest(t *testing.T) {
 	if err != nil || existing.Game != nil || existing.YourSeat != 1 || existing.Seats[0].DisplayName != "Robin" {
 		t.Fatalf("old invitation after upgrade = %+v, error %v", existing, err)
 	}
-	if _, _, err := database.JoinRoom(ctx, pool, oldRoomID, guestSession()); err != nil {
+	if _, _, err := database.JoinRoom(ctx, pool, oldRoomID, guestSession(), false); err != nil {
 		t.Fatal(err)
 	}
 	started, err := database.StartGame(ctx, pool, oldRoomID, session.ExistingHash)
 	if err != nil || started.Game == nil || started.Game.Revision != 1 {
 		t.Fatalf("start game in an existing room: %+v, %v", started, err)
 	}
-	room, created, err := database.CreateRoom(ctx, pool, session)
+	room, created, err := database.CreateRoom(ctx, pool, session, false)
 	if err != nil || created || room.YourSeat != 1 || room.Seats[0].DisplayName != "Robin" {
 		t.Fatalf("create with original session = %+v, new session %t, %v", room, created, err)
 	}
@@ -100,10 +100,10 @@ func TestConcurrentClaimsLeaveTwoPlayersAndTwoSeats(t *testing.T) {
 	}
 	invalid := guestSession()
 	invalid.NewHash = []byte{0}
-	if _, _, err := database.CreateRoom(ctx, pool, invalid); err == nil {
+	if _, _, err := database.CreateRoom(ctx, pool, invalid, false); err == nil {
 		t.Fatal("expected the session constraint to roll back an incomplete room")
 	}
-	host, created, err := database.CreateRoom(ctx, pool, guestSession())
+	host, created, err := database.CreateRoom(ctx, pool, guestSession(), false)
 	if err != nil || !created || host.YourSeat != 1 || host.Seats[0].DisplayName != "Player 1" {
 		t.Fatalf("create = %+v, new session %t, %v", host, created, err)
 	}
@@ -119,7 +119,7 @@ func TestConcurrentClaimsLeaveTwoPlayersAndTwoSeats(t *testing.T) {
 		go func() {
 			session := guestSession()
 			<-start
-			room, created, err := database.JoinRoom(ctx, pool, host.ID, session)
+			room, created, err := database.JoinRoom(ctx, pool, host.ID, session, false)
 			results <- claim{session, room, created, err}
 		}()
 	}
@@ -140,11 +140,11 @@ func TestConcurrentClaimsLeaveTwoPlayersAndTwoSeats(t *testing.T) {
 	}
 	retry := guestSession()
 	retry.ExistingHash = winner.NewHash
-	room, created, err := database.JoinRoom(ctx, pool, host.ID, retry)
+	room, created, err := database.JoinRoom(ctx, pool, host.ID, retry, false)
 	if err != nil || created || room.YourSeat != 2 {
 		t.Fatalf("repeat join = %+v, new session %t, %v", room, created, err)
 	}
-	if _, _, err := database.JoinRoom(ctx, pool, "00000000-0000-4000-8000-000000000000", guestSession()); !errors.Is(err, pgx.ErrNoRows) {
+	if _, _, err := database.JoinRoom(ctx, pool, "00000000-0000-4000-8000-000000000000", guestSession(), false); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("unknown room: %v", err)
 	}
 	var rooms, seats, players, sessions int
