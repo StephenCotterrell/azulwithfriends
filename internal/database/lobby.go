@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,6 +21,27 @@ type LobbyRoom struct {
 	Slug     string `json:"slug"`
 	HostName string `json:"hostName"`
 	IsHost   bool   `json:"isHost"`
+}
+
+// The browser's last-opened slug only ranks games the current guest can resume.
+func FindResumableGame(ctx context.Context, pool *pgxpool.Pool, sessionHash []byte, preferredSlug string) (string, error) {
+	if len(sessionHash) == 0 {
+		return "", nil
+	}
+	var slug string
+	err := pool.QueryRow(ctx, `
+		SELECT r.slug
+		FROM sessions s
+		JOIN room_seats seat ON seat.player_id = s.player_id
+		JOIN rooms r ON r.id = seat.room_id
+		WHERE s.token_hash = $1 AND s.expires_at > now()
+		  AND r.game_revision > 0 AND r.game_state->>'finished' = 'false'
+		ORDER BY (r.slug = $2) DESC, r.created_at DESC, r.id
+		LIMIT 1`, sessionHash, preferredSlug).Scan(&slug)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return slug, err
 }
 
 func ListLobby(ctx context.Context, pool *pgxpool.Pool, sessionHash []byte) ([]LobbyRoom, error) {

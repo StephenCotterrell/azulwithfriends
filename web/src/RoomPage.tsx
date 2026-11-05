@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { APIError, inviteURL, postJSON, requestJSON, roomName, roomPath, type Move, type Room } from "./api";
 import { GuestPanel } from "./GuestPanel";
+import { rememberGame } from "./recentGame";
 import { GameTable, PlayGuide } from "./GameTable";
 
 function canJoin(room: Room) {
@@ -130,6 +131,17 @@ export function RoomPage({ id }: { id: string }) {
   const joinFromInvite = useEffectEvent(() => { void act({ name: "join" }); });
 
   const slug = room?.slug;
+  const activeGameSlug = room?.yourSeat && room.game && !room.game.finished ? room.slug : null;
+  useEffect(() => {
+    if (!activeGameSlug) return;
+    function rememberVisibleGame() {
+      if (activeGameSlug && roomPageVisible()) rememberGame(activeGameSlug);
+    }
+    rememberVisibleGame();
+    document.addEventListener("visibilitychange", rememberVisibleGame);
+    return () => document.removeEventListener("visibilitychange", rememberVisibleGame);
+  }, [activeGameSlug]);
+
   useEffect(() => {
     if (!slug) return;
     document.title = `${roomName(slug)} · Azul with friends`;

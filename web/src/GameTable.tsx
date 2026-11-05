@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { colors, type Board, type Color, type Game, type Move, type Room, type RoundScore, type Tile } from "./api";
 import "./table.css";
 
 const floorCosts = [1, 1, 2, 2, 2, 3, 3];
 const sourceName = (source: number) => source === 0 ? "Center" : `Factory ${source}`;
+
+function firstPlayerNote(floorSize: number) {
+  if (floorSize >= floorCosts.length) {
+    return "Your floor is full. You take the first-player marker at no extra cost and start next round.";
+  }
+  return `First-player marker on floor space ${floorSize + 1} (−${floorCosts[floorSize]}). You start next round.`;
+}
 
 function TilePatterns() {
   return <svg className="tile-patterns" aria-hidden="true" focusable="false">
@@ -29,8 +36,16 @@ function Ceramic({ color, ghost = false, preview = false }: { color?: Tile; ghos
 
 type Pick = { source: number; color: Color; count: number; revision: number };
 
+function focusControl(control: HTMLButtonElement | null, region: string) {
+  if (!control) return;
+  control.focus({ preventScroll: true });
+  control.closest(region)?.scrollIntoView({ block: "nearest" });
+  // On a short landscape screen the whole region may not fit.
+  control.scrollIntoView({ block: "nearest" });
+}
+
 function Supply({ game, active, selected, onPick }: {
-  game: Game; active: boolean; selected: Pick | null; onPick: (pick: Pick) => void;
+  game: Game; active: boolean; selected: Pick | null; onPick: (pick: Pick, button: HTMLButtonElement) => void;
 }) {
   function draftButton(source: number, color: Color, tiles: Color[], index: number) {
     const count = tiles.filter(tile => tile === color).length;
@@ -39,7 +54,7 @@ function Supply({ game, active, selected, onPick }: {
     return <button key={source === 0 ? color : index} type="button" className="tile-group" data-source={source} data-color={color}
       aria-label={`Take ${count} ${color} from ${sourceName(source)}`} tabIndex={duplicate ? -1 : undefined}
       aria-pressed={selected?.source === source && selected.color === color}
-      disabled={!active} onClick={() => onPick({ source, color, count, revision: game.revision })}>
+      disabled={!active} onClick={event => onPick({ source, color, count, revision: game.revision }, event.currentTarget)}>
       <Ceramic color={color} />
       {source === 0 && count > 1 && <span className="tile-quantity" aria-hidden="true">×{count}</span>}
     </button>;
@@ -61,9 +76,10 @@ function Supply({ game, active, selected, onPick }: {
   </section>;
 }
 
-function PlayerBoard({ player, seat, own, name, selected, legalMoves, onPlace, previous, round }: {
+function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round }: {
   player: Board; seat: number; own: boolean; name: string; selected: Pick | null; legalMoves: Move[];
-  onPlace: (row: number) => void; previous?: RoundScore; round?: number;
+  previewMarker: boolean; busy: boolean;
+  onPlace: (row: number, clickCount: number) => void; onChangeTiles: () => void; previous?: RoundScore; round?: number;
 }) {
   const allowed = (row: number) => own && !!selected && legalMoves.some(move =>
     move.source === selected.source && move.color === selected.color && move.row === row);
@@ -72,6 +88,14 @@ function PlayerBoard({ player, seat, own, name, selected, legalMoves, onPlace, p
       <h2>{name} {own && <small>You</small>}</h2>
       <p className="points"><strong>{player.score}</strong> pts</p>
     </header>
+    {selected && <div className="placement-summary">
+      <div id="draft-selection">
+        <strong>{selected.count} {selected.color} {selected.count === 1 ? "tile" : "tiles"}</strong> · {sourceName(selected.source)}
+        <div role="status">{busy ? "Saving your move…" : "Choose a line or the floor."}</div>
+        {previewMarker && <span className="marker-note">{firstPlayerNote(player.floor.length)}</span>}
+      </div>
+      <button type="button" className="text-button change-tiles" disabled={busy} onClick={onChangeTiles}>Change tiles</button>
+    </div>}
     <div className="board-grid">
       {player.lines.map((line, index) => {
         const row = index + 1;
@@ -87,8 +111,9 @@ function PlayerBoard({ player, seat, own, name, selected, legalMoves, onPlace, p
         });
         const wall = player.wall[index];
         return <div key={row} className="board-row">
-          {own ? <button type="button" className="pattern-row" data-row={row} disabled={!enabled}
-            aria-label={enabled ? `Place on pattern line ${row}${overflow ? `, ${overflow} overflow to floor` : ""}` : description} onClick={() => onPlace(row)}>
+          {own ? <button type="button" className="pattern-row" data-row={row} disabled={!enabled || busy}
+            aria-label={enabled ? `Place on pattern line ${row}, ${line.count} of ${row} filled${overflow ? `, ${overflow} overflow to floor` : ""}` : description}
+            aria-describedby={enabled ? "draft-selection" : undefined} onClick={event => onPlace(row, event.detail)}>
             <span className="row-note">{overflow ? `+${overflow} ↓` : row}</span>{slots}
           </button> : <div className="pattern-row" role="img" aria-label={description}><span className="row-note">{row}</span>{slots}</div>}
           <div className="wall-row" role="group" aria-label={`Wall row ${row}`}>
@@ -101,13 +126,18 @@ function PlayerBoard({ player, seat, own, name, selected, legalMoves, onPlace, p
       })}
     </div>
     <div className="floor-caption"><h3 className="board-heading">Floor line</h3>
-      {own && selected && <button type="button" className="floor-action" data-row={0} disabled={!allowed(0)} onClick={() => onPlace(0)}>Place on floor</button>}
+      {own && selected && <button type="button" className="floor-action" data-row={0} disabled={!allowed(0) || busy}
+        aria-describedby="draft-selection" onClick={event => onPlace(0, event.detail)}>Place on floor</button>}
     </div>
-    <ol className="floor" aria-label="Floor penalties">{floorCosts.map((cost, index) =>
-      <li key={index} aria-label={`Floor space ${index + 1}, ${player.floor[index] === "first" ? "first-player marker" : player.floor[index] ?? "empty"}, minus ${cost}`}>
-        <Ceramic color={player.floor[index]} /><span aria-hidden="true">−{cost}</span>
-      </li>
-    )}</ol>
+    <ol className="floor" aria-label="Floor penalties">{floorCosts.map((cost, index) => {
+      const preview = previewMarker && index === player.floor.length;
+      const tile = preview ? "first" : player.floor[index];
+      const label = tile === "first" ? "first-player marker" : tile ?? "empty";
+      return <li key={index}>
+        <span className="sr-only">Floor space {index + 1}, {preview && "preview of "}{label}, minus {cost}</span>
+        <Ceramic color={tile} preview={preview} /><span aria-hidden="true">−{cost}</span>
+      </li>;
+    })}</ol>
     {previous && <p className="round-score">Round {round} <span>+{previous.wall} wall</span><span>−{previous.penalty} floor</span></p>}
   </section>;
 }
@@ -136,30 +166,64 @@ export function GameTable({ room, game, busy, onMove }: {
   room: Room; game: Game; busy: boolean; onMove: (move: Move & { revision: number }) => void;
 }) {
   const [pick, setPick] = useState<Pick | null>(null);
+  const table = useRef<HTMLDivElement>(null);
+  const sourceButton = useRef<HTMLButtonElement | null>(null);
+  const submittedRevision = useRef<number | null>(null);
   const name = (seat: number) => room.seats.find(p => p.number === seat)?.displayName ?? `Player ${seat}`;
-  const active = !game.finished && game.turn === room.yourSeat && !busy;
-  const selected = active && pick?.revision === game.revision ? pick : null;
-  function place(row: number) {
-    if (!selected) return;
-    onMove({ source: selected.source, color: selected.color, row, revision: selected.revision });
+  const yourTurn = !game.finished && game.turn === room.yourSeat;
+  const active = yourTurn && !busy;
+  const selected = yourTurn && pick?.revision === game.revision ? pick : null;
+  const takesMarker = selected?.source === 0 && game.markerInCenter;
+
+  useLayoutEffect(() => {
+    if (!selected || !table.current) return;
+    focusControl(table.current.querySelector<HTMLButtonElement>(".own button[data-row]:enabled"), ".player-board");
+  }, [selected]);
+
+  useLayoutEffect(() => {
+    if (busy || submittedRevision.current === null || game.revision <= submittedRevision.current) return;
+    submittedRevision.current = null;
+    // Only hand off focus if the player is still at the placement controls.
+    if (document.activeElement !== document.body && !document.activeElement?.matches("[data-row]")) return;
+    const next = active ? table.current?.querySelector<HTMLButtonElement>(".supply button:enabled") :
+      table.current?.querySelector<HTMLElement>(".game-heading h1");
+    next?.focus();
+  }, [busy, game.revision, active]);
+
+  function changeTiles() {
     setPick(null);
+    submittedRevision.current = null;
+    focusControl(sourceButton.current, ".supply");
+  }
+
+  function place(row: number, clickCount: number) {
+    // A double tap on the supply can land on a row after the board scrolls.
+    if (!selected || busy || clickCount > 1) return;
+    submittedRevision.current = selected.revision;
+    onMove({ source: selected.source, color: selected.color, row, revision: selected.revision });
   }
   const status = game.turn === room.yourSeat ? "Your turn" : `${name(game.turn)}’s turn`;
-  return <div className="game-table" data-game-revision={game.revision} data-turn={game.turn}>
+  return <div ref={table} className="game-table" data-game-revision={game.revision} data-turn={game.turn}
+    onKeyDown={event => {
+      // Holding Enter to pick must not also activate the newly focused destination.
+      if (event.key === "Enter" && event.repeat) event.preventDefault();
+    }}>
     <TilePatterns />
-    <div className="game-heading"><h1>{game.finished ? "Final scores" : `Round ${game.round}`}</h1>
+    <div className="game-heading"><h1 tabIndex={-1}>{game.finished ? "Final scores" : `Round ${game.round}`}</h1>
       {!game.finished && <p className="turn" role="status"><i className={game.turn === room.yourSeat ? "active" : ""} />{status}</p>}
     </div>
     {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} /> : <>
-      <Supply game={game} active={active} selected={selected} onPick={setPick} />
-      <div className="draft-help" role="status">{busy ? "Saving your move…" : selected ?
-        <><strong>{selected.count} {selected.color}</strong> · Choose a line or the floor.</> :
-        active ? "Choose a tile color." : null}</div>
+      <Supply game={game} active={active} selected={selected} onPick={(nextPick, button) => {
+        sourceButton.current = button;
+        setPick(nextPick);
+      }} />
+      <div className="draft-help" role="status">{active && !selected ? "Choose a tile color." : null}</div>
     </>}
     {game.lastMove && <p className="last-draft" role="status"><strong>Last draft</strong> {name(game.lastMove.seat)} took {game.lastMove.count} {game.lastMove.color} from {game.lastMove.source === 0 ? "the center" : sourceName(game.lastMove.source)} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</p>}
     <div className="boards">{[room.yourSeat, 3 - room.yourSeat].map(seat =>
       <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
-        selected={selected} legalMoves={game.legalMoves} onPlace={place} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} />
+        selected={seat === room.yourSeat ? selected : null} previewMarker={seat === room.yourSeat && takesMarker} legalMoves={game.legalMoves}
+        busy={busy} onPlace={place} onChangeTiles={changeTiles} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} />
     )}</div>
   </div>;
 }

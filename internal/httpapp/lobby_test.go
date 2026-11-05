@@ -87,3 +87,48 @@ func TestHostListingAndGuestLobbyJoin(t *testing.T) {
 	post(bySlug+"/start", "{}", host, 200)
 	checkLobby(nil)
 }
+
+func TestLobbyResumesOnlyTheGuestsUnfinishedGame(t *testing.T) {
+	pool := openTestDB(t, dbtest.IsolatedDSN(t))
+	handler := New(pool, t.TempDir(), true)
+	check := func(cookie *http.Cookie, preferred, want string) {
+		t.Helper()
+		req := httptest.NewRequest("GET", "/api/lobby", nil)
+		if cookie != nil {
+			req.AddCookie(cookie)
+		}
+		req.Header.Set("X-Recent-Game", preferred)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		var lobby struct {
+			ResumeGame string `json:"resumeGame"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &lobby); err != nil || rec.Code != http.StatusOK || lobby.ResumeGame != want {
+			t.Fatalf("lobby status %d, resume %q; want %q (decode error %v)", rec.Code, lobby.ResumeGame, want, err)
+		}
+	}
+
+	created := sendRequest(handler, "POST", "/api/rooms", "{}", nil)
+	first := readGameRoom(t, created)
+	host := created.Result().Cookies()[0]
+	check(host, first.Slug, "")
+	joined := sendRequest(handler, "POST", "/api/rooms/"+first.Slug+"/join", "{}", nil)
+	guest := joined.Result().Cookies()[0]
+	readGameRoom(t, sendRequest(handler, "POST", "/api/rooms/"+first.Slug+"/start", "{}", host))
+	second := readGameRoom(t, sendRequest(handler, "POST", "/api/rooms", "{}", host))
+	readGameRoom(t, sendRequest(handler, "POST", "/api/rooms/"+second.Slug+"/bot", `{"enabled":true}`, host))
+	readGameRoom(t, sendRequest(handler, "POST", "/api/rooms/"+second.Slug+"/start", "{}", host))
+
+	check(host, "", second.Slug)
+	check(host, first.Slug, first.Slug)
+	check(guest, second.Slug, first.Slug)
+	check(nil, first.Slug, "")
+	if _, err := pool.Exec(t.Context(), `UPDATE rooms SET game_state = jsonb_set(game_state, '{finished}', 'true') WHERE id = $1`, second.ID); err != nil {
+		t.Fatal(err)
+	}
+	check(host, second.Slug, first.Slug)
+	if _, err := pool.Exec(t.Context(), "UPDATE sessions SET expires_at = now()"); err != nil {
+		t.Fatal(err)
+	}
+	check(host, first.Slug, "")
+}

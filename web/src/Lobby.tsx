@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { requestJSON, roomName, roomPath, type LobbyRoom } from "./api";
+import { recentGame } from "./recentGame";
 
 type Props = {
   entering: string | null;
@@ -7,9 +8,10 @@ type Props = {
   joinError: string;
   refreshKey: number;
   onJoin: (slug: string) => void;
+  onResumeGame: (slug: string | null) => void;
 };
 
-export function Lobby({ entering, disabled, joinError, refreshKey, onJoin }: Props) {
+export function Lobby({ entering, disabled, joinError, refreshKey, onJoin, onResumeGame }: Props) {
   const [rooms, setRooms] = useState<LobbyRoom[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -24,13 +26,19 @@ export function Lobby({ entering, disabled, joinError, refreshKey, onJoin }: Pro
       const controller = new AbortController();
       request = controller;
       try {
-        const data = await requestJSON<{ rooms: LobbyRoom[] }>("/api/lobby", { signal: controller.signal });
+        const preferred = recentGame();
+        const data = await requestJSON<{ rooms: LobbyRoom[]; resumeGame?: string }>("/api/lobby", {
+          signal: controller.signal,
+          headers: preferred ? { "X-Recent-Game": preferred } : undefined,
+        });
         if (controller.signal.aborted) return;
         setRooms(data.rooms);
+        onResumeGame(data.resumeGame ?? null);
         setLoadError(false);
       } catch {
         if (controller.signal.aborted) return;
         setLoadError(true);
+        onResumeGame(null);
       }
       if (Date.now() < deadline) timer = window.setTimeout(read, 15000);
       else setPaused(true);
@@ -41,13 +49,19 @@ export function Lobby({ entering, disabled, joinError, refreshKey, onJoin }: Pro
     }
     function resume() {
       stop();
-      if (document.hidden) return;
+      if (document.hidden) {
+        onResumeGame(null);
+        return;
+      }
       setPaused(false);
       deadline = Date.now() + 5 * 60 * 1000;
       void read();
     }
     function onShow(event: PageTransitionEvent) {
-      if (event.persisted) resume();
+      if (event.persisted) {
+        onResumeGame(null);
+        resume();
+      }
     }
     resume();
     document.addEventListener("visibilitychange", resume);
@@ -59,7 +73,7 @@ export function Lobby({ entering, disabled, joinError, refreshKey, onJoin }: Pro
       window.removeEventListener("pageshow", onShow);
       window.removeEventListener("online", resume);
     };
-  }, [attempt, refreshKey]);
+  }, [attempt, refreshKey, onResumeGame]);
 
   return (
     <section className="lobby" aria-labelledby="lobby-title">
