@@ -227,6 +227,10 @@ export function RoomPage({ id }: { id: string }) {
     setPending(action);
     setActionError("");
     if (action.name === "join") setRetryJoin(false);
+    if (action.name === "close") {
+      uncertainWrite.current = null;
+      setReadError("");
+    }
     try {
       if (action.name === "close") {
         const result = await postJSON<{ closed: boolean }>(`${action.roomPath}/close`);
