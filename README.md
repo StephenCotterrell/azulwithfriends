@@ -6,7 +6,7 @@ The game uses the standard colored wall. The server randomly selects the first p
 
 During a bot match or from its final scores, choose **Leave game**, then **Leave and close room**. This removes the saved game, closes the invitation, and returns you to the lobby.
 
-The playing table fits the screen on mobile and desktop, with fixed positions for tiles, move instructions and scores. On mobile, tap **Opponent** to see their live board; on desktop, their miniature board stays beside the table. **How to play** and room settings open over the table. Very small or zoomed windows can still scroll to keep every control accessible. Final scores show both full-size boards.
+Your opponent’s live miniature board shows their pattern lines, wall, floor and score while you play. It stays beside the table on desktop and at the top of the screen as you scroll on mobile. Final scores show both full-size boards.
 
 Rooms have a four-word name and an invitation at `https://azulwithfriends.com/room/<name>`. Link-only rooms are the default. The host can list or unlist an open seat. A public listing lasts one hour and disappears when the second player joins. The invitation continues to work after unlisting or expiry.
 
