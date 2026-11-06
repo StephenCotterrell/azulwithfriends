@@ -3,6 +3,7 @@ import { APIError, inviteURL, postJSON, requestJSON, roomName, roomPath, type Mo
 import { GuestPanel } from "./GuestPanel";
 import { rememberGame } from "./recentGame";
 import { GameTable, PlayGuide } from "./GameTable";
+import { GameDialog } from "./GameDialog";
 
 function canJoin(room: Room) {
   return room.yourSeat === 0 && room.seats.length === 1 && !room.game;
@@ -121,6 +122,7 @@ export function RoomPage({ id }: { id: string }) {
   const [retryJoin, setRetryJoin] = useState(false);
   const [pending, setPending] = useState<RoomAction | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [gameTool, setGameTool] = useState<"help" | "settings" | null>(null);
   const writing = useRef(false);
   const triedInvite = useRef(false);
   const currentRead = useRef<AbortController | null>(null);
@@ -277,6 +279,11 @@ export function RoomPage({ id }: { id: string }) {
   const host = room?.yourSeat === 1;
   const bot = room?.seats.find(seat => seat.isBot);
   const closeRoomPath = host && bot && room?.game ? `/api/rooms/${encodeURIComponent(room.id)}` : null;
+  const activeGame = Boolean(room?.game && !room.game.finished);
+  const notices = <>
+    {actionError && !confirmClose && <p className="game-error" role="alert">{actionError}</p>}
+    {readError && !confirmClose && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>}
+  </>;
   const title = missing ? "Room not found" : room ? roomName(room.slug) : "Room for two";
   let status = "";
   if (host && !full) status = room?.listed ? "Waiting for a second player." : "Invite a friend or add a bot to the open seat.";
@@ -286,7 +293,7 @@ export function RoomPage({ id }: { id: string }) {
   else if (!seated && !embedded && !retryJoin) status = "Joining room…";
 
   return (
-    <main className={room?.game ? "room-page playing" : "room-page"}>
+    <main className={room?.game ? `room-page playing${activeGame ? " active-game" : ""}` : "room-page"}>
       <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
         {room?.game && <span className="room-header-name">{roomName(room.slug)}</span>}
         {closeRoomPath && <button type="button" className="secondary leave-game" disabled={!!pending}
@@ -294,18 +301,27 @@ export function RoomPage({ id }: { id: string }) {
       </header>
       {confirmClose && closeRoomPath && <CloseRoomDialog busy={pending?.name === "close"} error={readError || actionError}
         onConfirm={() => void act({ name: "close", roomPath: closeRoomPath })} onCancel={() => { setConfirmClose(false); setActionError(""); }} />}
-      {actionError && !confirmClose && <p className="game-error" role="alert">{actionError}</p>}
-      {readError && !confirmClose && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>}
+      {activeGame ? !confirmClose && (actionError || (readError && !missing)) && <div className="match-notices">{notices}</div> : notices}
       {room?.game ? <>
         <GameTable room={room} game={room.game} busy={!!pending} onMove={move => void act({ name: "moves", body: move })} />
-        <div className="game-tools">
+        {activeGame ? <footer className="match-tools" aria-label="Game tools">
+          <button type="button" className="text-button" onClick={() => setGameTool("help")}>How to play</button>
+          <button type="button" className="text-button" onClick={() => setGameTool("settings")}>{bot ? "Room settings" : "Room and invite"}</button>
+          <button type="button" className="text-button" onClick={refresh}>Refresh table</button>
+        </footer> : <div className="game-tools">
           <PlayGuide />
           <details className="room-settings"><summary>{bot ? "Room settings" : "Room and invite"}</summary>
             {!bot && <InviteLink url={inviteURL(room.slug)} />}
             <GuestPanel onSaved={refresh} />
           </details>
           <button type="button" className="text-button" onClick={refresh}>Refresh table</button>
-        </div>
+        </div>}
+        {activeGame && gameTool && <GameDialog title={gameTool === "help" ? "How to play" : bot ? "Room settings" : "Room and invite"} onClose={() => setGameTool(null)}>
+          {gameTool === "help" ? <PlayGuide open /> : <>
+            {!bot && <InviteLink url={inviteURL(room.slug)} />}
+            <GuestPanel onSaved={refresh} />
+          </>}
+        </GameDialog>}
       </> : <div className="room-layout">
         <div className="room-content">
           <h1>{title}</h1>

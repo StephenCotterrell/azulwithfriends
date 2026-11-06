@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { colors, type Board, type Color, type Game, type Move, type Room, type RoundScore, type Tile } from "./api";
+import { GameDialog } from "./GameDialog";
 import "./table.css";
 
 const floorCosts = [1, 1, 2, 2, 2, 3, 3];
@@ -7,9 +8,9 @@ const sourceName = (source: number) => source === 0 ? "Center" : `Factory ${sour
 
 function firstPlayerNote(floorSize: number) {
   if (floorSize >= floorCosts.length) {
-    return "Your floor is full. You take the first-player marker at no extra cost and start next round.";
+    return "First-player marker: no extra penalty. You start next round.";
   }
-  return `First-player marker on floor space ${floorSize + 1} (−${floorCosts[floorSize]}). You start next round.`;
+  return `First-player marker: −${floorCosts[floorSize]} on floor. You start next round.`;
 }
 
 function TilePatterns() {
@@ -36,12 +37,12 @@ function Ceramic({ color, ghost = false, preview = false, pending = false }: { c
 
 type Pick = { source: number; color: Color; count: number; revision: number };
 
-function focusControl(control: HTMLButtonElement | null, region: string) {
-  if (!control) return;
-  control.focus({ preventScroll: true });
-  control.closest(region)?.scrollIntoView({ block: "nearest" });
-  // On a short landscape screen the whole region may not fit.
-  control.scrollIntoView({ block: "nearest" });
+function focusControl(control: HTMLElement | null | undefined) {
+  control?.focus({ preventScroll: true });
+  // Very small or zoomed windows retain a scrolling, fully accessible layout.
+  if (getComputedStyle(document.documentElement).overflowY !== "hidden") {
+    control?.scrollIntoView({ block: "nearest" });
+  }
 }
 
 function Supply({ game, active, selected, onPick }: {
@@ -62,23 +63,25 @@ function Supply({ game, active, selected, onPick }: {
   return <section className="supply" aria-label="Drafting area">
     <div className="factory-rack">{game.factories.map((tiles, index) =>
       <div className="plate" key={index} role="group" aria-label={`${sourceName(index + 1)}${tiles.length ? "" : ", empty"}`}>
-        {tiles.map((color, slot) => draftButton(index + 1, color, tiles, slot))}
+        {Array.from({ length: 4 }, (_, slot) => tiles[slot]
+          ? draftButton(index + 1, tiles[slot], tiles, slot)
+          : <span key={slot} className="tile-group empty-slot" aria-hidden="true" />)}
       </div>
     )}</div>
     <div className="table-center">
       <h3>Center</h3>
       <div className="center-groups">
-        {game.markerInCenter && <span className="first-marker" role="img" aria-label="First-player marker" title="The first center draft takes this marker"><Ceramic color="first" /></span>}
-        {colors.filter(color => game.center.includes(color)).map(color => draftButton(0, color, game.center, 0))}
-        {!game.center.length && !game.markerInCenter && <span className="empty-plate">Empty</span>}
+        <span className={`first-marker${game.markerInCenter ? "" : " empty-slot"}`} role="img" aria-label="First-player marker" title="The first center draft takes this marker" aria-hidden={!game.markerInCenter}><Ceramic color="first" /></span>
+        {colors.map(color => game.center.includes(color) ? draftButton(0, color, game.center, 0)
+          : <span key={color} className="tile-group empty-slot" aria-hidden="true" />)}
       </div>
     </div>
   </section>;
 }
 
-function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round, compact = false }: {
+function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round, playing, compact = false }: {
   player: Board; seat: number; own: boolean; name: string; selected: Pick | null; legalMoves: Move[];
-  previewMarker: boolean; busy: boolean;
+  previewMarker: boolean; busy: boolean; playing: boolean;
   onPlace: (row: number, clickCount: number) => void; onChangeTiles: () => void; previous?: RoundScore; round?: number; compact?: boolean;
 }) {
   const allowed = (row: number) => own && !!selected && legalMoves.some(move =>
@@ -90,13 +93,13 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
       </div>
       <p className="points"><strong>{player.score}</strong> pts</p>
     </header>
-    {selected && <div className="placement-summary">
+    {own && playing && <div className="placement-summary">
       <div id="draft-selection">
-        <strong>{selected.count} {selected.color} {selected.count === 1 ? "tile" : "tiles"}</strong> · {sourceName(selected.source)}
-        <div role="status">{busy ? "Saving your move…" : "Choose a line or the floor."}</div>
+        <div role="status">{selected ? <><strong>{selected.count} {selected.color}</strong> · {sourceName(selected.source)}
+          {busy ? <span> · Saving…</span> : <span className="sr-only">. Choose a line or the floor.</span>}</> : "Choose a tile color on your turn."}</div>
         {previewMarker && <span className="marker-note">{firstPlayerNote(player.floor.length)}</span>}
       </div>
-      <button type="button" className="text-button change-tiles" disabled={busy} onClick={onChangeTiles}>Change tiles</button>
+      <button type="button" className={`text-button change-tiles${selected ? "" : " empty-slot"}`} disabled={!selected || busy} onClick={onChangeTiles}>Change tiles</button>
     </div>}
     <div className="board-grid">
       {player.lines.map((line, index) => {
@@ -132,7 +135,7 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
       })}
     </div>
     <div className="floor-caption"><h3 className="board-heading">Floor line</h3>
-      {own && selected && <button type="button" className="floor-action" data-row={0} disabled={!allowed(0) || busy}
+      {own && playing && <button type="button" className="floor-action" data-row={0} disabled={!allowed(0) || busy}
         aria-describedby="draft-selection" onClick={event => onPlace(0, event.detail)}>Place on floor</button>}
     </div>
     <ol className="floor" aria-label="Floor penalties">{floorCosts.map((cost, index) => {
@@ -144,7 +147,7 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
         <Ceramic color={tile} preview={preview} /><span aria-hidden="true">−{cost}</span>
       </li>;
     })}</ol>
-    {previous && !compact && <p className="round-score">Round {round} <span>+{previous.wall} wall</span><span>−{previous.penalty} floor</span></p>}
+    {!compact && (playing || previous) && <p className="round-score">{previous && <>Round {round} <span>+{previous.wall} wall</span><span>−{previous.penalty} floor</span></>}</p>}
   </section>;
 }
 
@@ -173,7 +176,7 @@ export function GameTable({ room, game, busy, onMove }: {
 }) {
   const [pick, setPick] = useState<Pick | null>(null);
   const table = useRef<HTMLDivElement>(null);
-  const opponent = useRef<HTMLElement>(null);
+  const [showOpponent, setShowOpponent] = useState(false);
   const sourceButton = useRef<HTMLButtonElement | null>(null);
   const submittedRevision = useRef<number | null>(null);
   const name = (seat: number) => room.seats.find(p => p.number === seat)?.displayName ?? `Player ${seat}`;
@@ -183,19 +186,8 @@ export function GameTable({ room, game, busy, onMove }: {
   const takesMarker = selected?.source === 0 && game.markerInCenter;
 
   useLayoutEffect(() => {
-    const panel = opponent.current;
-    if (!panel) return;
-    // Keep focused controls below the sticky board, including with larger text.
-    const updateHeight = () => table.current?.style.setProperty("--opponent-height", `${panel.getBoundingClientRect().height}px`);
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(panel);
-    return () => observer.disconnect();
-  }, [game.finished]);
-
-  useLayoutEffect(() => {
     if (!selected || !table.current) return;
-    focusControl(table.current.querySelector<HTMLButtonElement>(".own button[data-row]:enabled"), ".player-board");
+    focusControl(table.current.querySelector<HTMLButtonElement>(".own button[data-row]:enabled"));
   }, [selected]);
 
   useLayoutEffect(() => {
@@ -205,17 +197,17 @@ export function GameTable({ room, game, busy, onMove }: {
     if (document.activeElement !== document.body && !document.activeElement?.matches("[data-row]")) return;
     const next = active ? table.current?.querySelector<HTMLButtonElement>(".supply button:enabled") :
       table.current?.querySelector<HTMLElement>(".game-heading h1");
-    next?.focus();
+    focusControl(next);
   }, [busy, game.revision, active]);
 
   function changeTiles() {
     setPick(null);
     submittedRevision.current = null;
-    focusControl(sourceButton.current, ".supply");
+    focusControl(sourceButton.current);
   }
 
   function place(row: number, clickCount: number) {
-    // A double tap on the supply can land on a row after the board scrolls.
+    // A repeated activation should never submit two moves.
     if (!selected || busy || clickCount > 1) return;
     submittedRevision.current = selected.revision;
     onMove({ source: selected.source, color: selected.color, row, revision: selected.revision });
@@ -224,18 +216,22 @@ export function GameTable({ room, game, busy, onMove }: {
   const renderBoard = (seat: number, compact = false) =>
     <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
       selected={seat === room.yourSeat ? selected : null} previewMarker={seat === room.yourSeat && takesMarker} legalMoves={game.legalMoves}
-      busy={busy} onPlace={place} onChangeTiles={changeTiles} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} compact={compact} />;
+      busy={busy} onPlace={place} onChangeTiles={changeTiles} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} playing={!game.finished} compact={compact} />;
   return <div ref={table} className="game-table" data-game-revision={game.revision} data-turn={game.turn}
     onKeyDown={event => {
       // Holding Enter to pick must not also activate the newly focused destination.
       if (event.key === "Enter" && event.repeat) event.preventDefault();
     }}>
     <TilePatterns />
+    {showOpponent && !game.finished && <GameDialog title="Opponent’s board" onClose={() => setShowOpponent(false)} className="opponent-dialog">
+      {renderBoard(3 - room.yourSeat)}
+    </GameDialog>}
     <div className="game-heading"><h1 tabIndex={-1}>{game.finished ? "Final scores" : `Round ${game.round}`}</h1>
-      {!game.finished && <p className="turn" role="status"><i className={game.turn === room.yourSeat ? "active" : ""} />{status}</p>}
+      {!game.finished && <><p className="turn" role="status" title={status}><i className={game.turn === room.yourSeat ? "active" : ""} /><span>{status}</span></p>
+        <button type="button" className="secondary opponent-toggle" onClick={() => setShowOpponent(true)} aria-haspopup="dialog">Opponent · {game.players[2 - room.yourSeat].score} pts</button></>}
     </div>
     <div className={game.finished ? "finished-table" : "match-layout"}>
-      {!game.finished && <aside ref={opponent} className="opponent-overview" aria-label="Opponent overview">
+      {!game.finished && <aside className="opponent-overview" aria-label="Opponent overview">
         {renderBoard(3 - room.yourSeat, true)}
       </aside>}
       <div className="match-main">
@@ -244,17 +240,16 @@ export function GameTable({ room, game, busy, onMove }: {
             sourceButton.current = button;
             setPick(nextPick);
           }} />
-          <div className="draft-help" role="status">{active && !selected ? "Choose a tile color." : null}</div>
         </>}
-        {game.lastMove && <p className="last-draft" role="status"><strong>Last draft</strong> {name(game.lastMove.seat)} took {game.lastMove.count} {game.lastMove.color} from {game.lastMove.source === 0 ? "the center" : sourceName(game.lastMove.source)} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</p>}
+        <p className="last-draft" role="status">{game.lastMove && <><strong>Last draft</strong> {game.lastMove.seat === room.yourSeat ? "You" : "Opponent"} took {game.lastMove.count} {game.lastMove.color} from {game.lastMove.source === 0 ? "the center" : sourceName(game.lastMove.source)} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</>}</p>
         <div className="boards">{(game.finished ? [room.yourSeat, 3 - room.yourSeat] : [room.yourSeat]).map(seat => renderBoard(seat))}</div>
       </div>
     </div>
   </div>;
 }
 
-export function PlayGuide() {
-  return <details className="play-guide"><summary>How to play</summary>
+export function PlayGuide({ open = false }: { open?: boolean }) {
+  return <details className="play-guide" open={open}><summary>How to play</summary>
     <ol>
       <li>Take every tile of one color from a factory or the center. A factory’s other tiles move to the center. The first center draft also puts the start marker on your floor and gives you first turn next round.</li>
       <li>Choose one pattern line or the floor. A line holds one color and its wall row must still have room for that color. Extra tiles go to the floor.</li>
