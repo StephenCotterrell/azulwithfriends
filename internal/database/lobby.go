@@ -65,7 +65,7 @@ func ListLobby(ctx context.Context, pool *pgxpool.Pool, sessionHash []byte) ([]L
 		if err := rows.Scan(&room.Slug, &name, &room.IsHost); err != nil {
 			return nil, err
 		}
-		room.HostName = seatLabel(1, name, false).DisplayName
+		room.HostName = seatLabel(1, name, "").DisplayName
 		rooms = append(rooms, room)
 	}
 	return rooms, rows.Err()

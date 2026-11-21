@@ -8,7 +8,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 
 .welcome {
   width: min(1192px, calc(100% - clamp(64px, 11vw, 176px)));
@@ -82,8 +82,8 @@ button {
   cursor: pointer;
 }
 button:hover { background: #173e55; }
-button:disabled, input:disabled { opacity: .65; cursor: wait; }
-button:focus-visible, input:focus-visible { outline: 3px solid #b27a28; outline-offset: 3px; }
+button:disabled, input:disabled, select:disabled { opacity: .65; cursor: wait; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #b27a28; outline-offset: 3px; }
 .secondary { background: transparent; color: #254f68; border-color: #9eada6; }
 .secondary:hover { background: #e9eee7; }
 fieldset.room-visibility { min-width: 0; border: 0; margin: 0; padding: 0; }
@@ -160,10 +160,16 @@ a:focus-visible { outline: 3px solid #b27a28; outline-offset: 3px; }
 .roster-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
 .roster-heading h2 { margin: 0; font: 400 2rem Georgia, serif; color: #213f52; letter-spacing: -.04em; }
 .seats ol { list-style: none; margin: 0; padding: 0; }
-.seats li { display: flex; gap: 12px; align-items: center; border-top: 1px solid #dae0d6; min-height: 63px; padding: 11px 0; }
+.seats li { border-top: 1px solid #dae0d6; min-height: 63px; padding: 11px 0; }
+.seat-summary { display: flex; gap: 12px; align-items: center; min-height: 40px; }
 .seat-number { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 5px; background: #dce8df; color: #2d5957; font: 600 .95rem Georgia, serif; }
 .seat-name { overflow-wrap: anywhere; font-weight: 600; }
-.seat-action { margin-left: auto; flex: none; padding: 8px 13px; font-size: .92rem; }
+.seat-action { margin-left: auto; flex: none; }
+.seat-settings { margin: 7px 0 4px 44px; color: #233e45; }
+.seat-settings select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid #8a9b96; border-radius: 6px; color: #243c42; background: #fffef9; }
+.add-player { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.add-player select { flex: 1 1 6.5em; }
+.roster-start { border-top: 1px solid #dae0d6; padding-top: 16px; }
 .open-seat { color: #56685f; }
 .open-seat .seat-name { font-weight: 400; }
 .open-seat .seat-number { border: 1px dashed #899d91; background: transparent; }

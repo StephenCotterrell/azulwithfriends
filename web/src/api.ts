@@ -30,11 +30,27 @@ export function postJSON<T>(path: string, body: object = {}): Promise<T> {
   });
 }
 
+export const botPersonalities = {
+  noob: { name: "Noob", description: "Looks for a pattern line it can fill this turn." },
+  beginner: { name: "Beginner", description: "Tries to fit more tiles onto its lines and keep extras off the floor." },
+  intermediate: { name: "Intermediate", description: "Chooses the draft that looks best for its own board." },
+  competitive: { name: "Competitive", description: "Weighs each draft against your strongest immediate reply." },
+  tactical: { name: "Tactical", description: "Looks past your reply to plan a follow-up draft." },
+  advanced: { name: "Advanced", description: "Looks several drafts ahead for scoring chances and opportunities to block you." },
+  master: { name: "Master", description: "Searches furthest ahead, playing out the rest of the round when it can." },
+} as const;
+export type BotLevel = keyof typeof botPersonalities;
+export type Seat = { number: number; displayName: string; isBot: boolean; botLevel?: BotLevel };
+
+export function seatName(seat: Seat) {
+  return seat.isBot ? `${seat.displayName} (${botPersonalities[seat.botLevel ?? "competitive"].name})` : seat.displayName;
+}
+
 export type Room = {
   id: string;
   slug: string;
   listed: boolean;
-  seats: { number: number; displayName: string; isBot: boolean }[];
+  seats: Seat[];
   yourSeat: number;
   game: Game | null;
 };

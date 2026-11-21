@@ -78,7 +78,7 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 	// bot consecutive drafts across rounds. Commit only when the host can
 	// act again or the game has ended, so refreshes never need to drive it.
 	for snapshot.room.Seats[1].IsBot && snapshot.state.Turn == 2 && !snapshot.state.Finished {
-		botMove, ok := snapshot.state.BotMove()
+		botMove, ok := snapshot.state.BotMoveAtLevel(snapshot.room.Seats[1].BotLevel)
 		if !ok {
 			return Room{}, errors.New("bot has no move on its turn")
 		}

@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { APIError, inviteURL, postJSON, requestJSON, roomName, roomPath, type Move, type Room } from "./api";
+import { APIError, botPersonalities, inviteURL, postJSON, requestJSON, roomName, roomPath, seatName, type BotLevel, type Move, type Room } from "./api";
 import { GuestPanel } from "./GuestPanel";
 import { rememberGame } from "./recentGame";
 import { GameTable, PlayGuide } from "./GameTable";
@@ -8,12 +8,14 @@ function canJoin(room: Room) {
   return room.yourSeat === 0 && room.seats.length === 1 && !room.game;
 }
 
+type BotSetup = { enabled: true; level: BotLevel } | { enabled: false };
+
 type RoomAction =
   | { name: "join" | "start"; body?: never }
   | { name: "close"; roomPath: string }
   | { name: "moves"; body: Move & { revision: number } }
   | { name: "listing"; body: { listed: boolean } }
-  | { name: "bot"; body: { enabled: boolean } };
+  | { name: "bot"; body: BotSetup };
 
 function roomReflectsAction(room: Room, action: RoomAction) {
   switch (action.name) {
@@ -21,7 +23,10 @@ function roomReflectsAction(room: Room, action: RoomAction) {
     case "start": return Boolean(room.game);
     case "moves": return (room.game?.revision ?? 0) > action.body.revision;
     case "listing": return room.listed === action.body.listed;
-    case "bot": return room.seats.some(seat => seat.isBot) === action.body.enabled;
+    case "bot": {
+      const bot = room.seats.find(seat => seat.isBot);
+      return action.body.enabled ? bot?.botLevel === action.body.level : !bot;
+    }
     case "close": return false; // A closed room returns 404.
   }
 }
@@ -77,8 +82,24 @@ function InviteLink({ url }: { url: string }) {
   );
 }
 
-function Seats({ room, pending, onBot, onRefresh }: {
-  room: Room; pending: RoomAction | null; onBot: (enabled: boolean) => void; onRefresh: () => void;
+function AddPlayer({ pending, onAdd }: { pending: RoomAction | null; onAdd: () => void }) {
+  const [type, setType] = useState("bot");
+  return <div className="seat-settings">
+    <label className="field-label" htmlFor="player-type">Player type</label>
+    <div className="add-player">
+      <select id="player-type" value={type} disabled={!!pending} onChange={event => setType(event.target.value)}>
+        <option value="bot">AI</option>
+        <option value="human">Human</option>
+      </select>
+      {type === "bot"
+        ? <button type="button" disabled={!!pending} onClick={onAdd}>{pending?.name === "bot" ? "Adding…" : "Add bot"}</button>
+        : <a href="#invite-link">Get invite link</a>}
+    </div>
+  </div>;
+}
+
+function Seats({ room, pending, onBot, onStart, onRefresh }: {
+  room: Room; pending: RoomAction | null; onBot: (setup: BotSetup) => void; onStart: () => void; onRefresh: () => void;
 }) {
   return (
     <section className="seats" aria-labelledby="players-heading">
@@ -92,20 +113,38 @@ function Seats({ room, pending, onBot, onRefresh }: {
           {[1, 2].map(number => {
             const seat = room.seats.find(player => player.number === number);
             const own = number === room.yourSeat;
+            const canEdit = room.yourSeat === 1 && number === 2;
+            const level = pending?.name === "bot" && pending.body.enabled ? pending.body.level : seat?.botLevel ?? "competitive";
             return (
               <li key={number} className={seat ? "occupied-seat" : "open-seat"}>
-                <span className="seat-number" aria-label={`Seat ${number}`}>{number}</span>
-                <span className="seat-name">{seat?.displayName ?? "Open seat"}</span>
-                {own && <span className="you">You</span>}
-                {room.yourSeat === 1 && number === 2 && (!seat || seat.isBot) && (
-                  <button type="button" className="secondary seat-action" disabled={!!pending} onClick={() => onBot(!seat)}>
-                    {pending?.name === "bot" ? (pending.body.enabled ? "Adding…" : "Removing…") : (seat ? "Remove bot" : "Add bot")}
-                  </button>
+                <div className="seat-summary">
+                  <span className="seat-number" aria-label={`Seat ${number}`}>{number}</span>
+                  <span className="seat-name">{seat ? (canEdit ? seat.displayName : seatName(seat)) : "Open seat"}</span>
+                  {own && <span className="you">You</span>}
+                  {canEdit && seat?.isBot && <button type="button" className="text-button seat-action" disabled={!!pending} onClick={() => onBot({ enabled: false })}>
+                    {pending?.name === "bot" && !pending.body.enabled ? "Removing…" : "Remove bot"}
+                  </button>}
+                </div>
+                {canEdit && !seat && <AddPlayer pending={pending} onAdd={() => onBot({ enabled: true, level: "noob" })} />}
+                {canEdit && seat?.isBot && (
+                  <div className="seat-settings">
+                    <label className="field-label" htmlFor="bot-level">Personality</label>
+                    <select id="bot-level" value={level} disabled={!!pending} aria-describedby="bot-description"
+                      onChange={event => onBot({ enabled: true, level: event.target.value as BotLevel })}>
+                      {Object.entries(botPersonalities).map(([value, profile]) => <option key={value} value={value}>{profile.name}</option>)}
+                    </select>
+                    <p className="hint" id="bot-description">{botPersonalities[level].description}</p>
+                  </div>
                 )}
               </li>
             );
           })}
         </ol>
+        {room.yourSeat === 1 && room.seats.length === 2 && (
+          <div className="roster-start">
+            <button type="button" onClick={onStart} disabled={!!pending}>{pending?.name === "start" ? "Starting…" : "Start game"}</button>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -314,7 +353,6 @@ export function RoomPage({ id }: { id: string }) {
           {room && <>
             {status && <p className="intro" role="status">{status}</p>}
             {seated ? <>
-              {host && full && <button type="button" className="start-game" onClick={() => void act({ name: "start" })} disabled={!!pending}>{pending?.name === "start" ? "Starting…" : "Start game"}</button>}
               {!bot && <InviteLink url={inviteURL(room.slug)} />}
               {host && !full && <div className="listing-control">
                 <label><input type="checkbox" checked={pending?.name === "listing" ? pending.body.listed : room.listed} disabled={!!pending}
@@ -328,7 +366,8 @@ export function RoomPage({ id }: { id: string }) {
           </>}
           {paused && !readError && <p className="hint">Automatic updates paused. Refresh to see the latest players.</p>}
         </div>
-        {room && <Seats room={room} pending={pending} onBot={enabled => void act({ name: "bot", body: { enabled } })} onRefresh={refresh} />}
+        {room && <Seats room={room} pending={pending} onBot={body => void act({ name: "bot", body })}
+          onStart={() => void act({ name: "start" })} onRefresh={refresh} />}
       </div>}
     </main>
   );

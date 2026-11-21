@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/StephenCotterrell/azulwithfriends/internal/game"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -13,7 +14,8 @@ var (
 )
 
 // SetRoomBot competes for the same open seat as a guest joining by link or lobby.
-func SetRoomBot(ctx context.Context, pool *pgxpool.Pool, key string, sessionHash []byte, enabled bool) (Room, error) {
+// An omitted level keeps a seated bot's level and starts a new bot on Competitive.
+func SetRoomBot(ctx context.Context, pool *pgxpool.Pool, key string, sessionHash []byte, enabled bool, level game.BotLevel) (Room, error) {
 	if len(sessionHash) == 0 {
 		return Room{}, ErrNotHost
 	}
@@ -33,13 +35,21 @@ func SetRoomBot(ctx context.Context, pool *pgxpool.Pool, key string, sessionHash
 	if occupied && !room.Seats[1].IsBot {
 		return Room{}, ErrRoomFull
 	}
-	if enabled == occupied {
+	switch {
+	case !enabled && !occupied:
 		return room, nil
-	}
-	if enabled {
-		_, err = tx.Exec(ctx, "INSERT INTO room_seats (room_id, number, is_bot) VALUES ($1, 2, true)", room.ID)
-	} else {
+	case !enabled:
 		_, err = tx.Exec(ctx, "DELETE FROM room_seats WHERE room_id = $1 AND number = 2 AND is_bot", room.ID)
+	case occupied:
+		if level == "" || level == room.Seats[1].BotLevel {
+			return room, nil
+		}
+		_, err = tx.Exec(ctx, "UPDATE room_seats SET bot_level = $2 WHERE room_id = $1 AND number = 2 AND is_bot", room.ID, level)
+	default:
+		if level == "" {
+			level = game.BotCompetitive
+		}
+		_, err = tx.Exec(ctx, "INSERT INTO room_seats (room_id, number, is_bot, bot_level) VALUES ($1, 2, true, $2)", room.ID, level)
 	}
 	if err != nil {
 		return Room{}, err

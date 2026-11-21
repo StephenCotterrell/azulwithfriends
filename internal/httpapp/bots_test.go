@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/StephenCotterrell/azulwithfriends/internal/database/dbtest"
+	"github.com/StephenCotterrell/azulwithfriends/internal/game"
 )
 
 func TestHostCanPlayABotToCompletion(t *testing.T) {
@@ -26,7 +27,7 @@ func TestHostCanPlayABotToCompletion(t *testing.T) {
 		added := sendRequest(handler, "POST", url+"/bot", add, host)
 		room = readGameRoom(t, added)
 		if room.Listed || room.YourSeat != 1 || len(room.Seats) != 2 || room.Seats[0].IsBot ||
-			!room.Seats[1].IsBot || room.Seats[1].DisplayName == "" || len(added.Result().Cookies()) > 0 {
+			!room.Seats[1].IsBot || room.Seats[1].BotLevel != game.BotCompetitive || room.Seats[1].DisplayName == "" || len(added.Result().Cookies()) > 0 {
 			t.Fatalf("unexpected bot room: %+v", room)
 		}
 	}
@@ -37,13 +38,27 @@ func TestHostCanPlayABotToCompletion(t *testing.T) {
 	if !room.Listed || len(room.Seats) != 1 {
 		t.Fatalf("removing the bot did not reopen the listed room: %+v", room)
 	}
-	readGameRoom(t, sendRequest(handler, "POST", url+"/bot", add, host))
+	for _, level := range []string{"noob", "beginner", "intermediate", "competitive", "tactical", "advanced", "master"} {
+		body := `{"enabled":true,"level":"` + level + `"}`
+		room = readGameRoom(t, sendRequest(handler, "POST", url+"/bot", body, host))
+		if len(room.Seats) != 2 || room.Seats[1].BotLevel != game.BotLevel(level) || room.Seats[0].BotLevel != "" {
+			t.Fatalf("setting %s: %+v", level, room.Seats)
+		}
+	}
+	// A retry from an older client keeps the host's chosen level.
+	room = readGameRoom(t, sendRequest(handler, "POST", url+"/bot", add, host))
+	if room.Seats[1].BotLevel != game.BotMaster {
+		t.Fatalf("level after retry: %s", room.Seats[1].BotLevel)
+	}
 	var players, sessions int
 	err := pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM players), (SELECT count(*) FROM sessions)").Scan(&players, &sessions)
 	if err != nil || players != 1 || sessions != 1 {
 		t.Fatalf("bot room has %d players and %d sessions: %v", players, sessions, err)
 	}
 	started := readGameRoom(t, sendRequest(handler, "POST", url+"/start", "{}", host))
+	if got := sendRequest(handler, "POST", url+"/bot", `{"enabled":true,"level":"noob"}`, host); got.Code != http.StatusConflict {
+		t.Fatalf("host changed the bot level during play: %d", got.Code)
+	}
 	if got := sendRequest(handler, "POST", url+"/bot", remove, host); got.Code != http.StatusConflict {
 		t.Fatalf("host removed the bot during play: %d", got.Code)
 	}

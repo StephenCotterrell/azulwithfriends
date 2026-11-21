@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { colors, type Board, type Color, type Game, type Move, type Room, type RoundScore, type Tile } from "./api";
+import { colors, seatName, type Board, type Color, type Game, type Move, type Room, type RoundScore, type Tile } from "./api";
 import "./table.css";
 
 const floorCosts = [1, 1, 2, 2, 2, 3, 3];
@@ -176,7 +176,10 @@ export function GameTable({ room, game, busy, onMove }: {
   const opponent = useRef<HTMLElement>(null);
   const sourceButton = useRef<HTMLButtonElement | null>(null);
   const submittedRevision = useRef<number | null>(null);
-  const name = (seat: number) => room.seats.find(p => p.number === seat)?.displayName ?? `Player ${seat}`;
+  const name = (number: number) => {
+    const seat = room.seats.find(player => player.number === number);
+    return seat ? seatName(seat) : `Player ${number}`;
+  };
   const yourTurn = !game.finished && game.turn === room.yourSeat;
   const active = yourTurn && !busy;
   const selected = yourTurn && pick?.revision === game.revision ? pick : null;

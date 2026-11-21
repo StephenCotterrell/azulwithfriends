@@ -1,6 +1,6 @@
 # Azul with Friends
 
-A two-player browser adaptation of Azul built with Go, React, TypeScript and PostgreSQL. Create a room and choose **Add bot** to play against the computer. You can remove the bot before starting. To play with another person, share a **Link only** invitation or offer the open seat in the **Public lobby**. Opening an invitation automatically claims an open seat. Guests can also join directly from the lobby. Once both seats are filled, the host chooses **Start game**. You can play as a guest without signing in or choosing a display name. [Play Azul with Friends](https://azulwithfriends.com)
+A two-player browser adaptation of Azul built with Go, React, TypeScript and PostgreSQL. To play the computer, create a room, choose **AI** in the open seat and select **Add bot**. Choose a **Personality** on the bot’s seat, then select **Start game**. You can change the personality or remove the bot until the game starts. To play with another person, share a **Link only** invitation or offer the open seat in the **Public lobby**. Opening an invitation automatically claims an open seat. Guests can also join directly from the lobby. You can play as a guest without signing in or choosing a display name. [Play Azul with Friends](https://azulwithfriends.com)
 
 The game uses the standard colored wall. The server randomly selects the first player. On your turn, select a color from one factory or the center, then choose a highlighted pattern line or the floor. The bot takes its turns automatically. **Last draft** shows what it picked. Both boards score automatically after each round. Completing a wall row triggers final scoring at the end of that round. To play again, create a new room. [Publisher’s rulebook](https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf)
 
@@ -14,7 +14,7 @@ A private cookie remembers each player's seat on the original host in that brows
 
 Go validates each draft against the current turn and board revision, then commits it to PostgreSQL under a room lock. The saved position includes the bag and shuffle state so a restart can resume mid-round. The browser receives the visible boards, offers, and legal moves.
 
-The bot searches two turns ahead using the visible tiles. It weighs each legal draft against the opponent's strongest reply in the current round, estimating wall points, floor penalties, and progress on unfinished lines. The search follows the minimax approach in [Dom Wilson’s Azul AI](https://domwil.co.uk/posts/azul-ai/).
+New bots start at **Noob**, which looks for a line it can finish. **Beginner** tries to place larger groups. **Intermediate** evaluates its own projected score and unfinished lines. **Competitive** also considers the opponent’s strongest immediate reply and plays like the original bot. **Tactical**, **Advanced**, and **Master** search progressively further through the visible drafts, with Master able to play out the rest of a round when its search budget allows. All seven use the public table. The personalities and setup flow are adapted from [Dom Wilson’s Tiles](https://domwil.co.uk/games/tiles/). The deeper searches use the iterative deepening and alpha-beta pruning described in [his AI write-up](https://domwil.co.uk/posts/azul-ai/).
 
 ## Run locally
 

@@ -2,6 +2,7 @@ package httpapp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/StephenCotterrell/azulwithfriends/internal/database"
+	"github.com/StephenCotterrell/azulwithfriends/internal/game"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -130,9 +132,23 @@ func (a *app) setRoomListing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) setRoomBot(w http.ResponseWriter, r *http.Request) {
-	enabled, ok := a.readBoolOption(w, r, "enabled", true)
-	if !ok {
+	var input struct {
+		Enabled *bool           `json:"enabled"`
+		Level   json.RawMessage `json:"level"`
+	}
+	if !a.readJSON(w, r, &input) {
 		return
+	}
+	if input.Enabled == nil {
+		problem(w, http.StatusBadRequest, "Send a boolean enabled field.")
+		return
+	}
+	var level game.BotLevel
+	if input.Level != nil {
+		if !*input.Enabled || json.Unmarshal(input.Level, &level) != nil || !level.Valid() {
+			problem(w, http.StatusBadRequest, "Choose a valid level when adding or updating a bot.")
+			return
+		}
 	}
 	id := r.PathValue("id")
 	if !validRoomKey(id) {
@@ -141,7 +157,7 @@ func (a *app) setRoomBot(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	room, err := database.SetRoomBot(ctx, a.db, id, a.sessionHash(r), enabled)
+	room, err := database.SetRoomBot(ctx, a.db, id, a.sessionHash(r), *input.Enabled, level)
 	if err != nil {
 		roomError(w, err)
 		return

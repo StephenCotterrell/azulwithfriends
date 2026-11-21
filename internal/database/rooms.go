@@ -31,18 +31,19 @@ type RoomGame struct {
 }
 
 type Seat struct {
-	Number      int    `json:"number"`
-	DisplayName string `json:"displayName"`
-	IsBot       bool   `json:"isBot"`
+	Number      int           `json:"number"`
+	DisplayName string        `json:"displayName"`
+	IsBot       bool          `json:"isBot"`
+	BotLevel    game.BotLevel `json:"botLevel,omitempty"`
 }
 
-func seatLabel(number int, name string, isBot bool) Seat {
-	if isBot {
+func seatLabel(number int, name string, level game.BotLevel) Seat {
+	if level != "" {
 		name = "Azul Bot"
 	} else if name == "" {
 		name = "Player " + strconv.Itoa(number)
 	}
-	return Seat{Number: number, DisplayName: name, IsBot: isBot}
+	return Seat{Number: number, DisplayName: name, IsBot: level != "", BotLevel: level}
 }
 
 // NewHash identifies a candidate session. The caller issues its cookie only
@@ -91,13 +92,15 @@ func roomKeyColumn(key string) string {
 func readRoom(ctx context.Context, db roomReader, key string, sessionHash []byte) (roomSnapshot, error) {
 	rows, err := db.Query(ctx, `
 		SELECT r.id::text, r.slug, COALESCE(`+listingActive+`, false),
-		       seat.number, COALESCE(p.display_name, ''), seat.is_bot, s.player_id IS NOT NULL, r.game_revision,
+		       seat.number, COALESCE(p.display_name, ''),
+		       CASE WHEN seat.is_bot THEN COALESCE(seat.bot_level, $3) ELSE '' END,
+		       s.player_id IS NOT NULL, r.game_revision,
 		       CASE WHEN s.player_id IS NOT NULL THEN r.game_state END
 		FROM room_seats seat
 		JOIN rooms r ON r.id = seat.room_id
 		LEFT JOIN players p ON p.id = seat.player_id
 		LEFT JOIN sessions s ON s.player_id = p.id AND s.token_hash = $2 AND s.expires_at > now()
-		WHERE `+roomKeyColumn(key)+` = $1 ORDER BY seat.number`, key, sessionHash)
+		WHERE `+roomKeyColumn(key)+` = $1 ORDER BY seat.number`, key, sessionHash, game.BotCompetitive)
 	if err != nil {
 		return roomSnapshot{}, err
 	}
@@ -106,12 +109,13 @@ func readRoom(ctx context.Context, db roomReader, key string, sessionHash []byte
 	for rows.Next() {
 		var number int
 		var name string
-		var isBot, ownsSeat bool
+		var level game.BotLevel
+		var ownsSeat bool
 		var state *game.State
-		if err := rows.Scan(&snapshot.room.ID, &snapshot.room.Slug, &snapshot.room.Listed, &number, &name, &isBot, &ownsSeat, &snapshot.revision, &state); err != nil {
+		if err := rows.Scan(&snapshot.room.ID, &snapshot.room.Slug, &snapshot.room.Listed, &number, &name, &level, &ownsSeat, &snapshot.revision, &state); err != nil {
 			return roomSnapshot{}, err
 		}
-		snapshot.room.Seats = append(snapshot.room.Seats, seatLabel(number, name, isBot))
+		snapshot.room.Seats = append(snapshot.room.Seats, seatLabel(number, name, level))
 		if ownsSeat {
 			snapshot.room.YourSeat = number
 			snapshot.state = state
@@ -215,7 +219,7 @@ func seatAndCommit(ctx context.Context, tx pgx.Tx, room Room, session RoomSessio
 	if err := tx.Commit(ctx); err != nil {
 		return Room{}, false, err
 	}
-	room.Seats = append(room.Seats, seatLabel(room.YourSeat, player.DisplayName, false))
+	room.Seats = append(room.Seats, seatLabel(room.YourSeat, player.DisplayName, ""))
 	if len(room.Seats) == roomCapacity {
 		room.Listed = false
 	}

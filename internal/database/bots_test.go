@@ -24,7 +24,7 @@ func TestBotCompetesWithGuestForLastSeat(t *testing.T) {
 	botClaim, guestClaim := make(chan error, 1), make(chan error, 1)
 	go func() {
 		<-start
-		_, err := database.SetRoomBot(ctx, pool, room.ID, host.NewHash, true)
+		_, err := database.SetRoomBot(ctx, pool, room.ID, host.NewHash, true, "")
 		botClaim <- err
 	}()
 	go func() {
@@ -55,7 +55,9 @@ func TestBotClosesOneRoundAndStartsTheNext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.SetRoomBot(ctx, pool, room.ID, host.NewHash, true); err != nil {
+	// A seat created by a server predating bot levels must keep playing with the
+	// original search after the level migration.
+	if _, err := pool.Exec(ctx, "INSERT INTO room_seats (room_id, number, is_bot) VALUES ($1, 2, true)", room.ID); err != nil {
 		t.Fatal(err)
 	}
 	// After the host empties the last factory, the bot must take red and
@@ -79,7 +81,7 @@ func TestBotClosesOneRoundAndStartsTheNext(t *testing.T) {
 		t.Fatal(err)
 	}
 	board := moved.Game
-	if board.Revision != 12 || board.Round != 2 || board.Turn != 1 || board.LastMove == nil || board.LastMove.Seat != 2 {
+	if moved.Seats[1].BotLevel != game.BotCompetitive || board.Revision != 12 || board.Round != 2 || board.Turn != 1 || board.LastMove == nil || board.LastMove.Seat != 2 {
 		t.Fatalf("expected two automatic bot drafts: %+v", board)
 	}
 }

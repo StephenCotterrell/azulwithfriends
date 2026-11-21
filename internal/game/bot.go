@@ -6,36 +6,85 @@ import (
 	"slices"
 )
 
-// BotMove chooses a draft for the current seat. It considers every legal
-// draft and the opponent's strongest reply within the current round.
+type BotLevel string
+
+const (
+	BotNoob         BotLevel = "noob"
+	BotBeginner     BotLevel = "beginner"
+	BotIntermediate BotLevel = "intermediate"
+	BotCompetitive  BotLevel = "competitive"
+	BotTactical     BotLevel = "tactical"
+	BotAdvanced     BotLevel = "advanced"
+	BotMaster       BotLevel = "master"
+)
+
+func (level BotLevel) Valid() bool {
+	switch level {
+	case BotNoob, BotBeginner, BotIntermediate, BotCompetitive, BotTactical, BotAdvanced, BotMaster:
+		return true
+	}
+	return false
+}
+
+// BotMove preserves the original bot's two-draft search and tie breaking.
 func (s State) BotMove() (Move, bool) {
+	return s.BotMoveAtLevel(BotCompetitive)
+}
+
+func (s State) BotMoveAtLevel(level BotLevel) (Move, bool) {
 	position := State{Table: s.Table}
 	moves := position.legalMoves()
 	if len(moves) == 0 {
 		return Move{}, false
 	}
-	best, bestValue := moves[0], math.Inf(-1)
+	switch level {
+	case BotNoob, BotBeginner, BotIntermediate:
+		return position.simpleDraft(level, moves), true
+	case BotCompetitive:
+		return position.searchDraft(moves, 2, math.MaxInt), true
+	case BotTactical:
+		return position.searchDraft(moves, 3, 24_000), true
+	case BotAdvanced:
+		return position.searchDraft(moves, 5, 60_000), true
+	case BotMaster:
+		// A round starts with at most 20 colored tiles, one per draft at minimum.
+		return position.searchDraft(moves, 20, 150_000), true
+	default:
+		return Move{}, false
+	}
+}
+
+func (s *State) simpleDraft(level BotLevel, moves []Move) Move {
+	best, bestValue, leastSpill := moves[0], math.Inf(-1), 0
 	for _, move := range moves {
-		next := position.simulateDraft(move)
-		ours := projectBoard(next.Players[s.Turn-1])
-		replies := next.legalMoves()
-		value := math.Inf(1)
-		if len(replies) == 0 {
-			value = next.botValue(s.Turn, ours, projectBoard(next.Players[next.Turn-1]))
-		}
-		for _, reply := range replies {
-			after := next.simulateDraft(reply)
-			theirs := projectBoard(after.Players[next.Turn-1])
-			value = min(value, after.botValue(s.Turn, ours, theirs))
-			if value <= bestValue {
-				break // This draft cannot beat the best one already found.
+		next := s.simulateDraft(move)
+		player := next.Players[s.Turn-1]
+		var value float64
+		var spill int
+		switch level {
+		case BotNoob, BotBeginner:
+			placed := 0
+			if move.Row > 0 {
+				placed = player.Lines[move.Row-1].Count - s.Players[s.Turn-1].Lines[move.Row-1].Count
 			}
+			spill = next.LastMove.Count - placed
+			if level == BotBeginner {
+				value = float64(placed)
+			}
+			// A completion wins a tie on quantity for Beginner and is
+			// Noob's primary goal. Both then minimize wasted colored tiles.
+			if move.Row > 0 && player.Lines[move.Row-1].Count == move.Row {
+				value += 0.5
+			}
+		case BotIntermediate:
+			board := projectBoard(player)
+			value = float64(board.score) + board.progress
 		}
-		if value > bestValue {
-			best, bestValue = move, value
+		if value > bestValue || (value == bestValue && spill < leastSpill) {
+			best, bestValue, leastSpill = move, value, spill
 		}
 	}
-	return best, true
+	return best
 }
 
 func (s State) simulateDraft(m Move) State {
