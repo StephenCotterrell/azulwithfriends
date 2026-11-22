@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { colors, seatName, type Board, type Color, type Game, type Move, type Room, type RoundScore, type Tile } from "./api";
 import "./table.css";
 
@@ -93,7 +93,7 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
     {selected && <div className="placement-summary">
       <div id="draft-selection">
         <strong>{selected.count} {selected.color} {selected.count === 1 ? "tile" : "tiles"}</strong> · {sourceName(selected.source)}
-        <div role="status">{busy ? "Saving your move…" : "Choose a line or the floor."}</div>
+        <div role="status">{busy ? "Saving your move…" : "Choose a line or the floor. Click elsewhere to cancel."}</div>
         {previewMarker && <span className="marker-note">{firstPlayerNote(player.floor.length)}</span>}
       </div>
       <button type="button" className="text-button change-tiles" disabled={busy} onClick={onChangeTiles}>Change tiles</button>
@@ -201,6 +201,16 @@ export function GameTable({ room, game, busy, onMove }: {
     focusControl(table.current.querySelector<HTMLButtonElement>(".own button[data-row]:enabled"), ".player-board");
   }, [selected]);
 
+  useEffect(() => {
+    if (!selected || busy) return;
+    function handleClickAway(event: MouseEvent) {
+      if (event.target instanceof Element && table.current?.contains(event.target.closest("button"))) return;
+      clearPick();
+    }
+    document.addEventListener("click", handleClickAway, true);
+    return () => document.removeEventListener("click", handleClickAway, true);
+  }, [selected, busy]);
+
   useLayoutEffect(() => {
     if (busy || submittedRevision.current === null || game.revision <= submittedRevision.current) return;
     submittedRevision.current = null;
@@ -211,9 +221,13 @@ export function GameTable({ room, game, busy, onMove }: {
     next?.focus();
   }, [busy, game.revision, active]);
 
-  function changeTiles() {
+  function clearPick() {
     setPick(null);
     submittedRevision.current = null;
+  }
+
+  function changeTiles() {
+    clearPick();
     focusControl(sourceButton.current, ".supply");
   }
 
