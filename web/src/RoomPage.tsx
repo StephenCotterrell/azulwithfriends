@@ -3,7 +3,7 @@ import { APIError, botPersonalities, inviteURL, postJSON, requestJSON, roomName,
 import { GuestPanel } from "./GuestPanel";
 import { rememberGame } from "./recentGame";
 import { GameTable, PlayGuide } from "./GameTable";
-import { ThemePicker } from "./ThemePicker";
+import { ThemeToggle } from "./ThemeToggle";
 
 function canJoin(room: Room) {
   return room.yourSeat === 0 && room.seats.length === 1 && !room.game;
@@ -328,7 +328,7 @@ export function RoomPage({ id }: { id: string }) {
   return (
     <main className={room?.game ? "room-page playing" : "room-page"}>
       <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
-        <ThemePicker />
+        <ThemeToggle />
         {room?.game && <div className="room-header-game">
           <span className="room-header-name">{roomName(room.slug)}</span>
           {closeRoomPath && <button type="button" className="secondary leave-game" disabled={!!pending}

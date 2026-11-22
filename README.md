@@ -8,7 +8,7 @@ During a bot match or from its final scores, choose **Leave game**, then **Leave
 
 Your opponent’s live miniature board shows their pattern lines, wall, floor and score while you play. It stays beside the table on desktop and at the top of the screen as you scroll on mobile. Final scores show both full-size boards.
 
-The **Theme** menu in the lobby and room headers defaults to **System** and follows your device’s appearance. Choose **Light** or **Dark** to save an override in this browser. You can switch during a game.
+Azul follows your device’s appearance until you choose a theme. Click the moon in the lobby or room header to switch to dark mode, or the sun to switch to light mode. Your browser remembers your choice, including when you switch during a game.
 
 Rooms have a four-word name and an invitation at `https://azulwithfriends.com/room/<name>`. Link-only rooms are the default. The host can list or unlist an open seat. A public listing lasts one hour and disappears when the second player joins. The invitation continues to work after unlisting or expiry.
 

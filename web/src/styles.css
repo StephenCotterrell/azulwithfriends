@@ -64,8 +64,6 @@ input, select {
 }
 input { display: block; width: 100%; padding: 12px 14px; line-height: 1.45; }
 select { min-height: 44px; padding: 8px 10px; }
-.theme-picker { display: inline-flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: .85rem; }
-.theme-picker select { cursor: pointer; }
 input::placeholder { color: var(--text-muted); }
 input[aria-invalid="true"] { border-color: var(--error); }
 .hint, .error { font-size: .85rem; margin: 7px 0 0; }
@@ -87,6 +85,11 @@ button:disabled, input:disabled, select:disabled { opacity: .65; cursor: wait; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .secondary { background: transparent; color: var(--link); border-color: var(--border-control); }
 .secondary:hover { background: var(--hover); }
+.theme-toggle {
+  display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0;
+  border-radius: 50%; background: transparent; color: var(--text-heading);
+}
+.theme-toggle:hover { background: var(--hover); }
 fieldset.room-visibility { min-width: 0; border: 0; margin: 0; padding: 0; }
 .room-visibility legend { margin-bottom: 7px; padding: 0; font-size: .9rem; font-weight: 650; }
 .visibility-options { display: flex; gap: 8px; }
@@ -147,7 +150,7 @@ a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .room-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 20px; border-bottom: 1px solid var(--border); padding: 0 0 20px; }
 .room-header a { display: inline-flex; align-items: center; gap: .22em; min-height: 44px; color: var(--text-heading); text-decoration: none; font: 1.45rem Georgia, serif; }
 .room-header-name { overflow-wrap: anywhere; color: var(--text-muted); font-size: .92rem; }
-.room-header .theme-picker { margin-left: auto; }
+.room-header .theme-toggle { margin-left: auto; }
 .room-header-game { display: flex; align-items: center; gap: 12px; }
 .room-header img { margin-right: 9px; }
 .room-header em { color: var(--text-accent); }
@@ -194,11 +197,4 @@ a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 @media (max-width: 640px) {
   .room-header { row-gap: 4px; }
   .room-header-game { width: 100%; justify-content: space-between; }
-}
-@media (max-width: 420px) {
-  .room-header { column-gap: 8px; }
-  .room-header a { font-size: 1.1rem; }
-  .room-header img { width: 28px; height: 28px; margin-right: 4px; }
-  .room-header .theme-picker { gap: 5px; }
-  .room-header select { padding-inline: 5px; }
 }
