@@ -1,0 +1,40 @@
+/* Color roles are shared by all routes. Each pair lists light first, then dark. */
+:root {
+  color-scheme: light dark;
+
+  --canvas: light-dark(#f8f6ef, #142126);
+  --surface: light-dark(#fffdf7, #1e3035);
+  --surface-muted: light-dark(#efefe6, #23373b);
+  --control: light-dark(#fffef9, #18292e);
+
+  --text: light-dark(#233e45, #deebe8);
+  --text-heading: light-dark(#213f52, #e2edf6);
+  --text-muted: light-dark(#52665f, #b4c7c1);
+  --text-accent: light-dark(#2d696c, #91cfc7);
+  --link: light-dark(#254f68, #a3d3ec);
+
+  --border: light-dark(#b7c4ba, #4c6364);
+  --border-subtle: light-dark(#d6ded5, #3c5255);
+  --border-control: light-dark(#7d8d85, #819897);
+  --border-selected: light-dark(#44766a, #81b9a9);
+  --selected: light-dark(#e4ede4, #23483f);
+  --selected-hover: light-dark(#d9e7d9, #2e554b);
+
+  --action: light-dark(#254f68, #9fd3ec);
+  --action-hover: light-dark(#173e55, #b9e3f6);
+  --on-action: light-dark(#fff, #132c39);
+  --hover: light-dark(#e9eee7, #2d4348);
+  --focus: light-dark(#b27a28, #f4be6f);
+
+  --error: light-dark(#9c3d28, #ffab96);
+  --error-surface: light-dark(#fff2e5, #412d28);
+  --action-danger: light-dark(#8d402f, #f3a48d);
+  --action-danger-hover: light-dark(#743222, #ffc0ac);
+  --on-danger: light-dark(#fff, #371c16);
+  --backdrop: light-dark(#152d35a6, #061014bb);
+
+  --art-shade: light-dark(transparent, #0b1e2b73);
+}
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }

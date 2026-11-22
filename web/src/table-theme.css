@@ -1,0 +1,32 @@
+/* Game materials and states inherit the document's active color scheme. */
+.game-table {
+  --turn-waiting: light-dark(#b37c3d, #dba866);
+  --turn-active: light-dark(#387653, #88d0a1);
+  --winner-accent: light-dark(#ce9440, #e9b568);
+
+  --supply-surface: light-dark(#e7eee5, #263936);
+  --factory-glaze: light-dark(#fffdf5, #425655);
+  --factory-shade: light-dark(#eeeadd, #304344);
+  --factory-rim: light-dark(#fffcf0, #536968);
+  --factory-line: light-dark(#b7c9bd, #728680);
+  --table-shadow: light-dark(#40594e24, #040a0c42);
+
+  --ceramic-edge: light-dark(#243b4f70, #b5c6c181);
+  --ceramic-bevel: inset 0 1px 1px #ffffff70, inset 0 -2px 0 #071b2b20;
+  --slot-surface: light-dark(#eeede3, #2a3737);
+  --slot-edge: light-dark(#cccec3, #536560);
+  --wall-guide-surface: light-dark(#faf9f3, #243132);
+  --wall-guide-ink: light-dark(#77877c, #a1b3ac);
+  --wall-guide-edge: light-dark(#dde0d7, #4a5d58);
+  --wall-pending-surface: light-dark(#b7c1b6, #415751);
+  --wall-pending-ink: light-dark(#384b40, #edf4ec);
+  --penalty-text: light-dark(#775c4e, #d8bca7);
+}
+
+/* Glazes and motifs identify game pieces and stay recognizable in both themes. */
+.ceramic.blue { --glaze: #2475ad; --motif: #d9f2ff; }
+.ceramic.yellow { --glaze: #f5bc42; --motif: #845326; }
+.ceramic.red { --glaze: #b9503b; --motif: #ffe8c9; }
+.ceramic.black { --glaze: #36454a; --motif: #d8e2d7; }
+.ceramic.white { --glaze: #fff9e8; --motif: #427b7c; }
+.ceramic.first { --glaze: #70458d; --motif: #fff4dc; }

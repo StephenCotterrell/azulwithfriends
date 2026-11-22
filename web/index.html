@@ -3,7 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f8f6ef" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" />
+    <script>
+      // Restore the saved override before the stylesheet paints the page.
+      try {
+        const theme = localStorage.getItem("azul.theme.v1");
+        if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+      } catch { /* System colors also work when storage is unavailable. */ }
+    </script>
     <link rel="icon" href="/tile.svg" type="image/svg+xml" />
     <title>Azul with friends</title>
   </head>

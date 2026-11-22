@@ -8,6 +8,8 @@ During a bot match or from its final scores, choose **Leave game**, then **Leave
 
 Your opponent’s live miniature board shows their pattern lines, wall, floor and score while you play. It stays beside the table on desktop and at the top of the screen as you scroll on mobile. Final scores show both full-size boards.
 
+The **Theme** menu in the lobby and room headers defaults to **System** and follows your device’s appearance. Choose **Light** or **Dark** to save an override in this browser. You can switch during a game.
+
 Rooms have a four-word name and an invitation at `https://azulwithfriends.com/room/<name>`. Link-only rooms are the default. The host can list or unlist an open seat. A public listing lasts one hour and disappears when the second player joins. The invitation continues to work after unlisting or expiry.
 
 A private cookie remembers each player's seat on the original host in that browser for up to 30 days. Earlier UUID invitations still open the same room. If you started a game on the Railway hostname, use its original link to resume your seat there.
@@ -31,6 +33,20 @@ ALLOW_INSECURE_COOKIES=true go run ./cmd/server
 ```
 
 Open `http://localhost:8080`. For frontend development, leave Go running and run `npm --prefix web run dev` in a second terminal. Vite forwards `/api` requests to Go. Set `ALLOW_INSECURE_COOKIES=true` only for local HTTP development.
+
+## Styling new components
+
+Use the CSS variables in [the shared palette](web/src/theme.css) for surfaces, text, borders and interactive states. Components inherit the active color scheme, so a panel uses the same rule in either theme.
+
+```css
+.score-card {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+```
+
+If a component needs a new color role, name it for its purpose and define its light and dark values together with `light-dark()` in the palette. [The table palette](web/src/table-theme.css) holds colors specific to game materials and board states, including the tile glazes and motifs that identify each piece. Check new components in both themes, including keyboard focus, selection and disabled states where applicable.
 
 ## Verify a change
 

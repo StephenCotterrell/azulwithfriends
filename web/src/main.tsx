@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { GuestPanel } from "./GuestPanel";
 import { Lobby } from "./Lobby";
 import { RoomPage } from "./RoomPage";
+import { ThemePicker } from "./ThemePicker";
 import { APIError, postJSON, requestJSON, roomName, roomPath, type Room } from "./api";
 import "./styles.css";
 
@@ -63,9 +64,10 @@ function Welcome() {
   return (
     <main className="welcome">
       <div className="welcome-content">
-        <div className="masthead" aria-hidden="true">
+        <div className="masthead">
           <img src="/tile.svg" alt="" width="38" height="38" />
-          <span />
+          <span className="masthead-rule" />
+          <ThemePicker />
         </div>
         <h1>Azul <em>with friends</em></h1>
         <div className="entry-panel">
