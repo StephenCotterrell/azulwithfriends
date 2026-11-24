@@ -75,7 +75,7 @@
 .results th:first-child { text-align: left; padding-left: 0; }
 .results tbody th { font-weight: 400; }
 .results tr:last-child td,.results tr:last-child th { font-weight: 650; border-bottom: 0; }
-.another-room { display: inline-block; margin-top: 12px; }
+.results .actions { gap: 8px 16px; margin-top: 12px; }
 .game-tools { margin-top: 20px; border-top: 1px solid var(--border); }
 .game-tools details { border-bottom: 1px solid var(--border-subtle); padding: 9px 0; }
 .game-tools summary { cursor: pointer; padding: 5px 0; font-weight: 600; color: var(--text-accent); }

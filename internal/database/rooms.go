@@ -68,9 +68,10 @@ func GetRoom(ctx context.Context, db roomReader, id string, sessionHash []byte) 
 
 // The private state is separate from Room, the response sent to a browser.
 type roomSnapshot struct {
-	room     Room
-	state    *game.State
-	revision int
+	room                Room
+	state               *game.State
+	revision            int
+	rematchFromRevision int
 }
 
 func (s roomSnapshot) publicRoom() Room {
@@ -94,7 +95,7 @@ func readRoom(ctx context.Context, db roomReader, key string, sessionHash []byte
 		SELECT r.id::text, r.slug, COALESCE(`+listingActive+`, false),
 		       seat.number, COALESCE(p.display_name, ''),
 		       CASE WHEN seat.is_bot THEN COALESCE(seat.bot_level, $3) ELSE '' END,
-		       s.player_id IS NOT NULL, r.game_revision,
+		       s.player_id IS NOT NULL, r.game_revision, r.rematch_from_revision,
 		       CASE WHEN s.player_id IS NOT NULL THEN r.game_state END
 		FROM room_seats seat
 		JOIN rooms r ON r.id = seat.room_id
@@ -112,7 +113,7 @@ func readRoom(ctx context.Context, db roomReader, key string, sessionHash []byte
 		var level game.BotLevel
 		var ownsSeat bool
 		var state *game.State
-		if err := rows.Scan(&snapshot.room.ID, &snapshot.room.Slug, &snapshot.room.Listed, &number, &name, &level, &ownsSeat, &snapshot.revision, &state); err != nil {
+		if err := rows.Scan(&snapshot.room.ID, &snapshot.room.Slug, &snapshot.room.Listed, &number, &name, &level, &ownsSeat, &snapshot.revision, &snapshot.rematchFromRevision, &state); err != nil {
 			return roomSnapshot{}, err
 		}
 		snapshot.room.Seats = append(snapshot.room.Seats, seatLabel(number, name, level))

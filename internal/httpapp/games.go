@@ -29,6 +29,32 @@ func (a *app) startGame(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, room)
 }
 
+func (a *app) rematchGame(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Revision int `json:"revision"`
+	}
+	if !a.readJSON(w, r, &input) {
+		return
+	}
+	if input.Revision < 1 {
+		problem(w, http.StatusBadRequest, "Send the revision of the finished game.")
+		return
+	}
+	id := r.PathValue("id")
+	if !validRoomKey(id) {
+		roomError(w, pgx.ErrNoRows)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	room, err := database.RematchGame(ctx, a.db, id, a.sessionHash(r), input.Revision)
+	if err != nil {
+		roomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, room)
+}
+
 func (a *app) closeBotGame(w http.ResponseWriter, r *http.Request) {
 	if !a.readEmptyObject(w, r) {
 		return

@@ -2,6 +2,7 @@ package httpapp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -37,6 +38,16 @@ func moveBody(t *testing.T, rev int, move game.Move) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+func shortRowMove(moves []game.Move) game.Move {
+	move := moves[0]
+	for _, candidate := range moves {
+		if candidate.Row > 0 && (move.Row == 0 || candidate.Row < move.Row) {
+			move = candidate
+		}
+	}
+	return move
 }
 
 func TestGameThroughHTTP(t *testing.T) {
@@ -145,12 +156,7 @@ func TestGameThroughHTTP(t *testing.T) {
 		if position.Revision > 600 || len(position.LegalMoves) == 0 {
 			t.Fatal("the strategy of filling short rows stopped making progress")
 		}
-		move := position.LegalMoves[0]
-		for _, candidate := range position.LegalMoves {
-			if candidate.Row > 0 && (move.Row == 0 || candidate.Row < move.Row) {
-				move = candidate
-			}
-		}
+		move := shortRowMove(position.LegalMoves)
 		next := readGameRoom(t, sendRequest(handler, "POST", url+"/moves", moveBody(t, position.Revision, move), players[position.Turn-1])).Game
 		if next.Revision != position.Revision+1 {
 			t.Fatal("successful move did not advance the revision")
@@ -165,5 +171,12 @@ func TestGameThroughHTTP(t *testing.T) {
 	}
 	if got := readGameRoom(t, sendRequest(handler, "POST", url+"/start", "{}", host)); !reflect.DeepEqual(got.Game, position) {
 		t.Fatal("a repeated start reset the final scores")
+	}
+	rematchBody := fmt.Sprintf(`{"revision":%d}`, position.Revision)
+	if got := sendRequest(handler, "POST", url+"/rematch", rematchBody, players[1]); got.Code != http.StatusForbidden {
+		t.Fatalf("non-host rematch: %d %s", got.Code, got.Body)
+	}
+	if got := sendRequest(handler, "POST", url+"/rematch", rematchBody, host); got.Code != http.StatusConflict {
+		t.Fatalf("host rematch of a human game: %d %s", got.Code, got.Body)
 	}
 }

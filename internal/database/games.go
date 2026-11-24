@@ -11,24 +11,38 @@ import (
 )
 
 var (
-	ErrNoSeat            = errors.New("Join this room to play.")
-	ErrStartRequiresHost = errors.New("Only the room host can start the game.")
-	ErrNeedPlayers       = errors.New("Both seats must be filled before starting.")
-	ErrNotStarted        = errors.New("Start the game before drafting tiles.")
-	ErrStaleMove         = errors.New("The board has changed. Choose your move on the current board.")
-	ErrIllegalMove       = errors.New("That move is unavailable. Check whose turn it is and choose a legal move.")
+	ErrNoSeat             = errors.New("Join this room to play.")
+	ErrStartRequiresHost  = errors.New("Only the room host can start the game.")
+	ErrNeedPlayers        = errors.New("Both seats must be filled before starting.")
+	ErrNotStarted         = errors.New("Start the game before drafting tiles.")
+	ErrStaleMove          = errors.New("The board has changed. Choose your move on the current board.")
+	ErrIllegalMove        = errors.New("That move is unavailable. Check whose turn it is and choose a legal move.")
+	ErrRematchUnavailable = errors.New("A rematch is available after finishing a game against a bot.")
+	ErrStaleRematch       = errors.New("The game has changed. Use the latest results to start a rematch.")
+)
+
+type gameAction uint8
+
+const (
+	start gameAction = iota
+	draft
+	rematch
 )
 
 // StartGame is safe for the host to repeat, including after the last round.
 func StartGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash []byte) (Room, error) {
-	return changeGame(ctx, pool, id, sessionHash, 0, nil)
+	return changeGame(ctx, pool, id, sessionHash, start, 0, game.Move{})
 }
 
 func PlayMove(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash []byte, revision int, move game.Move) (Room, error) {
-	return changeGame(ctx, pool, id, sessionHash, revision, &move)
+	return changeGame(ctx, pool, id, sessionHash, draft, revision, move)
 }
 
-func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash []byte, revision int, move *game.Move) (Room, error) {
+func RematchGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash []byte, revision int) (Room, error) {
+	return changeGame(ctx, pool, id, sessionHash, rematch, revision, game.Move{})
+}
+
+func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash []byte, action gameAction, revision int, move game.Move) (Room, error) {
 	if len(sessionHash) == 0 {
 		return Room{}, ErrNoSeat
 	}
@@ -38,7 +52,7 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 	}
 	defer tx.Rollback(ctx)
 
-	// The same room lock serializes claiming a seat, starting, and drafting.
+	// The same room lock serializes seat claims and game updates.
 	// Read the latest committed snapshot only after acquiring it.
 	if err := lockRoom(ctx, tx, id); err != nil {
 		return Room{}, err
@@ -50,34 +64,54 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 	if snapshot.room.YourSeat == 0 {
 		return Room{}, ErrNoSeat
 	}
-	if move == nil {
-		if snapshot.room.YourSeat != 1 {
-			return Room{}, ErrStartRequiresHost
-		}
+	if action != draft && snapshot.room.YourSeat != 1 {
+		return Room{}, ErrStartRequiresHost
+	}
+	isBotGame := len(snapshot.room.Seats) == roomCapacity && snapshot.room.Seats[1].IsBot
+	switch action {
+	case start:
 		if snapshot.state != nil {
 			return snapshot.publicRoom(), nil
 		}
 		if len(snapshot.room.Seats) != roomCapacity {
 			return Room{}, ErrNeedPlayers
 		}
-		state := game.New()
-		snapshot.state = &state
-	} else {
+	case rematch:
+		if !isBotGame || snapshot.state == nil {
+			return Room{}, ErrRematchUnavailable
+		}
+		// An exact retry can resume the rematch even after intervening drafts.
+		if revision > 0 && revision == snapshot.rematchFromRevision {
+			return snapshot.publicRoom(), nil
+		}
+		if !snapshot.state.Finished {
+			return Room{}, ErrRematchUnavailable
+		}
+		if revision != snapshot.revision {
+			return Room{}, ErrStaleRematch
+		}
+		snapshot.rematchFromRevision = revision
+	case draft:
 		if snapshot.state == nil {
 			return Room{}, ErrNotStarted
 		}
 		if revision != snapshot.revision {
 			return Room{}, ErrStaleMove
 		}
-		if err := snapshot.state.Apply(snapshot.room.YourSeat, *move); err != nil {
+		if err := snapshot.state.Apply(snapshot.room.YourSeat, move); err != nil {
 			return Room{}, ErrIllegalMove
 		}
 	}
+	if action != draft {
+		state := game.New()
+		snapshot.state = &state
+	}
+	// Revisions are scoped to the room, so a draft from an earlier game stays stale.
 	snapshot.revision++
 	// The first player is random, and the first-player marker can give the
 	// bot consecutive drafts across rounds. Commit only when the host can
 	// act again or the game has ended, so refreshes never need to drive it.
-	for snapshot.room.Seats[1].IsBot && snapshot.state.Turn == 2 && !snapshot.state.Finished {
+	for isBotGame && snapshot.state.Turn == 2 && !snapshot.state.Finished {
 		botMove, ok := snapshot.state.BotMoveAtLevel(snapshot.room.Seats[1].BotLevel)
 		if !ok {
 			return Room{}, errors.New("bot has no move on its turn")
@@ -91,7 +125,9 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 	if err != nil {
 		return Room{}, err
 	}
-	if _, err := tx.Exec(ctx, "UPDATE rooms SET game_state = $2::jsonb, game_revision = $3 WHERE id = $1", snapshot.room.ID, string(encoded), snapshot.revision); err != nil {
+	if _, err := tx.Exec(ctx, `
+		UPDATE rooms SET game_state = $2::jsonb, game_revision = $3, rematch_from_revision = $4
+		WHERE id = $1`, snapshot.room.ID, string(encoded), snapshot.revision, snapshot.rematchFromRevision); err != nil {
 		return Room{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {

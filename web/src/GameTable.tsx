@@ -148,7 +148,11 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
   </section>;
 }
 
-function Results({ game, name, yourSeat }: { game: Game; name: (seat: number) => string; yourSeat: number }) {
+type Rematch = { pending: boolean; onStart: () => void };
+
+function Results({ game, name, yourSeat, busy, rematch }: {
+  game: Game; name: (seat: number) => string; yourSeat: number; busy: boolean; rematch?: Rematch;
+}) {
   const tied = game.winners.length === 2;
   const winner = game.winners[0];
   const equalPoints = game.players[0].score === game.players[1].score;
@@ -164,18 +168,23 @@ function Results({ game, name, yourSeat }: { game: Game; name: (seat: number) =>
         })}</tr>
       )}</tbody>
     </table>
-    <a className="another-room" href="/">Create another room</a>
+    <div className="actions">
+      {rematch && <button type="button" disabled={busy} onClick={rematch.onStart}>{rematch.pending ? "Starting rematch…" : "Rematch"}</button>}
+      <a href="/">Create another room</a>
+    </div>
   </section>;
 }
 
-export function GameTable({ room, game, busy, onMove }: {
-  room: Room; game: Game; busy: boolean; onMove: (move: Move & { revision: number }) => void;
+export function GameTable({ room, game, busy, onMove, rematch }: {
+  room: Room; game: Game; busy: boolean; onMove: (move: Move & { revision: number }) => void; rematch?: Rematch;
 }) {
   const [pick, setPick] = useState<Pick | null>(null);
   const table = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const opponent = useRef<HTMLElement>(null);
   const sourceButton = useRef<HTMLButtonElement | null>(null);
   const submittedRevision = useRef<number | null>(null);
+  const wasFinished = useRef(game.finished);
   const name = (number: number) => {
     const seat = room.seats.find(player => player.number === number);
     return seat ? seatName(seat) : `Player ${number}`;
@@ -201,6 +210,11 @@ export function GameTable({ room, game, busy, onMove }: {
     focusControl(table.current.querySelector<HTMLButtonElement>(".own button[data-row]:enabled"), ".player-board");
   }, [selected]);
 
+  useLayoutEffect(() => {
+    if (wasFinished.current && !game.finished && document.activeElement === document.body) heading.current?.focus();
+    wasFinished.current = game.finished;
+  }, [game.finished]);
+
   useEffect(() => {
     if (!selected || busy) return;
     function handleClickAway(event: MouseEvent) {
@@ -217,7 +231,7 @@ export function GameTable({ room, game, busy, onMove }: {
     // Only hand off focus if the player is still at the placement controls.
     if (document.activeElement !== document.body && !document.activeElement?.matches("[data-row]")) return;
     const next = active ? table.current?.querySelector<HTMLButtonElement>(".supply button:enabled") :
-      table.current?.querySelector<HTMLElement>(".game-heading h1");
+      heading.current;
     next?.focus();
   }, [busy, game.revision, active]);
 
@@ -248,7 +262,7 @@ export function GameTable({ room, game, busy, onMove }: {
       if (event.key === "Enter" && event.repeat) event.preventDefault();
     }}>
     <TilePatterns />
-    <div className="game-heading"><h1 tabIndex={-1}>{game.finished ? "Final scores" : `Round ${game.round}`}</h1>
+    <div className="game-heading"><h1 ref={heading} tabIndex={-1}>{game.finished ? "Final scores" : `Round ${game.round}`}</h1>
       {!game.finished && <p className="turn" role="status"><i className={game.turn === room.yourSeat ? "active" : ""} />{status}</p>}
     </div>
     <div className={game.finished ? "finished-table" : "match-layout"}>
@@ -256,7 +270,7 @@ export function GameTable({ room, game, busy, onMove }: {
         {renderBoard(3 - room.yourSeat, true)}
       </aside>}
       <div className="match-main">
-        {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} /> : <>
+        {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} busy={busy} rematch={rematch} /> : <>
           <Supply game={game} active={active} selected={selected} onPick={(nextPick, button) => {
             sourceButton.current = button;
             setPick(nextPick);

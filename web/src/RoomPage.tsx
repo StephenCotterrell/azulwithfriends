@@ -15,6 +15,7 @@ type RoomAction =
   | { name: "join" | "start"; body?: never }
   | { name: "close"; roomPath: string }
   | { name: "moves"; body: Move & { revision: number } }
+  | { name: "rematch"; body: { revision: number } }
   | { name: "listing"; body: { listed: boolean } }
   | { name: "bot"; body: BotSetup };
 
@@ -22,7 +23,8 @@ function roomReflectsAction(room: Room, action: RoomAction) {
   switch (action.name) {
     case "join": return !canJoin(room);
     case "start": return Boolean(room.game);
-    case "moves": return (room.game?.revision ?? 0) > action.body.revision;
+    case "moves":
+    case "rematch": return (room.game?.revision ?? 0) > action.body.revision;
     case "listing": return room.listed === action.body.listed;
     case "bot": {
       const bot = room.seats.find(seat => seat.isBot);
@@ -317,6 +319,7 @@ export function RoomPage({ id }: { id: string }) {
   const host = room?.yourSeat === 1;
   const bot = room?.seats.find(seat => seat.isBot);
   const closeRoomPath = host && bot && room?.game ? `/api/rooms/${encodeURIComponent(room.id)}` : null;
+  const finishedBotGame = host && bot && room?.game?.finished ? room.game : null;
   const title = missing ? "Room not found" : room ? roomName(room.slug) : "Room for two";
   let status = "";
   if (host && !full) status = room?.listed ? "Waiting for a second player." : "Invite a friend or add a bot to the open seat.";
@@ -340,7 +343,11 @@ export function RoomPage({ id }: { id: string }) {
       {actionError && !confirmClose && <p className="game-error" role="alert">{actionError}</p>}
       {readError && !confirmClose && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>}
       {room?.game ? <>
-        <GameTable room={room} game={room.game} busy={!!pending} onMove={move => void act({ name: "moves", body: move })} />
+        <GameTable room={room} game={room.game} busy={!!pending} onMove={move => void act({ name: "moves", body: move })}
+          rematch={finishedBotGame ? {
+            pending: pending?.name === "rematch",
+            onStart: () => void act({ name: "rematch", body: { revision: finishedBotGame.revision } }),
+          } : undefined} />
         <div className="game-tools">
           <PlayGuide />
           <details className="room-settings"><summary>{bot ? "Room settings" : "Room and invite"}</summary>
