@@ -104,6 +104,7 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
         const enabled = allowed(row);
         const capacity = row - line.count;
         const overflow = enabled ? Math.max(0, selected!.count - capacity) : 0;
+        const floorLabel = overflow ? `${overflow} ${overflow === 1 ? "tile" : "tiles"} to floor` : "";
         const projected = enabled ? Math.min(capacity, selected!.count) : 0;
         const description = `Pattern line ${row}, ${line.count} of ${row}${line.color ? " " + line.color : ""}`;
         const slots = Array.from({ length: row }, (_, col) => {
@@ -114,9 +115,10 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
         const wall = player.wall[index];
         return <div key={row} className="board-row">
           {own ? <button type="button" className="pattern-row" data-row={row} disabled={!enabled || busy}
-            aria-label={enabled ? `Place on pattern line ${row}, ${line.count} of ${row} filled${overflow ? `, ${overflow} overflow to floor` : ""}` : description}
+            aria-label={enabled ? `Place on pattern line ${row}, ${line.count} of ${row} filled${floorLabel ? `, ${floorLabel}` : ""}` : description}
             aria-describedby={enabled ? "draft-selection" : undefined} onClick={event => onPlace(row, event.detail)}>
-            <span className="row-note">{overflow ? `+${overflow} ↓` : row}</span>{slots}
+            <span className={floorLabel ? "row-overflow" : "row-note"}>{floorLabel || row}</span>
+            <span className="pattern-tiles">{slots}</span>
           </button> : <div className="pattern-row" role="img" aria-label={description}><span className="row-note">{row}</span>{slots}</div>}
           <div className="wall-row" role="group" aria-label={`Wall row ${row}`}>
             {wall.map((filled, col) => {
