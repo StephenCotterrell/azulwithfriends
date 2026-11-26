@@ -176,7 +176,8 @@
   .marker-note { margin-top: 0; font-size: .72rem; }
   .placement-summary .change-tiles { font-size: .75rem; }
   .cancel-hint { display: none; }
-
+}
+@media (max-width: 640px), (max-width: 1024px) and (orientation: portrait), (max-width: 960px) and (max-height: 540px) and (orientation: landscape) {
   .game-tools {
     position: relative;
     display: flex;
@@ -204,7 +205,8 @@
     font-size: .9rem;
   }
   .settings-room-name { display: block; margin: 0 0 4px; font-weight: 650; }
-
+}
+@media (max-width: 640px), (max-width: 960px) and (max-height: 540px) and (orientation: landscape) {
   .results { padding: 6px 8px; margin-bottom: 4px; }
   .results h2 { font-size: 1.25rem; }
   .results p { margin: 3px 0; font-size: .78rem; line-height: 1.25; }
@@ -216,28 +218,10 @@
   .results .actions button { min-height: 36px; padding: 4px 8px; }
   .finished-table .last-draft { font-size: .75rem; line-height: 1.25; }
 
-  .match-layout .supply {
-    --tile-size: 27px;
-    --factory-size: 93px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2px;
-    justify-items: center;
-    padding: 4px;
-  }
   .match-layout .factory-rack { display: contents; }
   .match-layout .plate { width: min(100%, var(--factory-size)); gap: 0; }
-  .match-layout .plate:nth-child(n+4) { margin: -3px 0 0 10px; }
-  .match-layout .table-center {
-    flex-direction: column;
-    justify-content: center;
-    gap: 1px;
-    padding: 0;
-    border: 0;
-  }
   .match-layout .table-center h3 { font-size: .72rem; }
-  .match-layout .center-groups { display: grid; grid-template-columns: repeat(3, auto); gap: 0; }
   .match-layout .center-groups .first-marker { margin: 0; }
-  .match-layout .center-groups .tile-group { min-width: 32px; min-height: 32px; }
   .match-layout .empty-plate { grid-column: 1 / -1; text-align: center; }
 }
 @media (max-width: 800px), (any-pointer: coarse) {
@@ -257,16 +241,14 @@
 @media (max-width: 640px), (max-width: 960px) and (max-height: 540px) and (orientation: landscape) {
   .boards .pattern-row { min-height: calc(var(--tile-size) + 4px); padding-block: 1px; }
   .boards .floor-action { min-height: 36px; padding-inline: 5px; }
-}
-/* A single staggered rack leaves room for placement on shorter screens. */
-@media (max-width: 640px) and (max-height: 810px), (max-width: 960px) and (max-height: 540px) and (orientation: landscape) {
   .match-layout .supply {
     --factory-size: min(68px, calc((100vw - 34px) / 5));
     --tile-size: min(23px, calc(var(--factory-size) * .33));
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 3px 2px;
+    justify-items: center;
+    padding: 4px;
   }
-  .match-layout .plate:nth-child(n+4) { margin: 0; }
   .match-layout .plate:nth-child(even) { margin-top: 8px; }
   .match-layout .plate .tile-group { min-width: 24px; min-height: 24px; padding: 0; place-items: center; }
   .match-layout .table-center {
@@ -275,16 +257,71 @@
     min-height: 34px;
     flex-direction: row;
     justify-content: start;
+    align-items: center;
     gap: 6px;
+    padding: 0;
+    border: 0;
     border-top: 1px solid var(--border);
   }
-  .match-layout .center-groups { grid-template-columns: repeat(6, auto); gap: 2px; }
+  .match-layout .center-groups { display: grid; grid-template-columns: repeat(6, auto); gap: 2px; }
   .match-layout .center-groups .tile-group { min-width: 36px; min-height: 36px; }
   .match-layout .boards .player-board { --tile-size: clamp(17px, 5vw, 22px); }
   .match-layout .boards .pattern-row { min-height: max(24px, var(--tile-size) + 3px); padding-block: 0; }
 }
+/* Keep the five factories in view as Safari's address bar changes height. */
+@media (max-width: 640px) and (min-height: 700px) and (orientation: portrait) {
+  .match-layout .supply {
+    --factory-size: min(92px, 10svh, (100vw - 34px) / 5);
+    --tile-size: min(35px, var(--factory-size) * .38);
+  }
+  .match-layout .plate .tile-group {
+    width: calc(var(--factory-size) / 2 - 1px);
+    height: calc(var(--factory-size) / 2 - 1px);
+    justify-items: end;
+    padding: 1px;
+  }
+  .match-layout .plate .tile-group:nth-child(even) { justify-items: start; }
+  .match-layout .plate .tile-group:is(:only-child, :nth-child(3):last-child) { justify-items: center; }
+  .match-layout .center-groups .tile-group { min-width: 40px; min-height: 40px; }
+  .match-layout .boards .own { --tile-size: clamp(22px, 11svh - 53px, min((100vw - 94px) / 10, 36px)); }
+  .player-board.compact {
+    --tile-size: clamp(15px, min(4.4vw, 2.3svh), 21px);
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: 1fr auto 1fr;
+    column-gap: clamp(10px, 3vw, 18px);
+    padding-inline: 8px;
+  }
+  .compact .board-grid { grid-column: 1; grid-row: 1 / -1; width: auto; }
+  .compact .board-header {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 3px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .compact .board-player { display: contents; }
+  .compact .points { grid-column: 2; grid-row: 1; }
+  .compact .board-header h2 { grid-column: 1 / -1; grid-row: 2; }
+  .compact .floor-caption { margin: 4px 0 2px; }
+  .compact .floor { --tile-size: min(3.4vw, 16px); grid-template-columns: repeat(7, auto); justify-content: start; gap: 2px; }
+
+  .room-page.playing { --table-control-height: clamp(38px, 12svh - 51px, 44px); padding-block: 2px; }
+  .playing .room-header :is(a, button) { min-height: var(--table-control-height); }
+  .playing .room-header .theme-toggle { height: var(--table-control-height); width: var(--table-control-height); }
+  .game-heading { padding-block: 2px; }
+  .game-heading h1 { font-size: 1.6rem; }
+  .opponent-overview { padding-top: 0; }
+  .match-layout { gap: 4px; }
+  .match-layout .boards { margin-top: 4px; }
+  .game-tools summary { min-height: var(--table-control-height); line-height: var(--table-control-height); }
+  .game-tools > .text-button { min-height: var(--table-control-height); }
+}
 /* Short portrait screens can share one row between the opponent and the supply. */
-@media (max-width: 640px) and (max-height: 725px) and (orientation: portrait) {
+@media (max-width: 640px) and (height < 700px) and (orientation: portrait) {
   .match-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
   .match-layout .match-main, .opponent-overview { display: contents; }
   .opponent-overview .last-draft { grid-column: 1 / -1; grid-row: 1; margin: 0; font-size: .7rem; }
@@ -346,6 +383,20 @@
   .finished-table .floor li { font-size: .6rem; }
   .finished-table .board-heading { font-size: .63rem; white-space: nowrap; }
   .finished-table .round-score { flex-wrap: wrap; gap: 0 4px; }
+}
+/* Stack the final boards when there is room for each floor line beside its wall. */
+@media (min-width: 360px) and (max-width: 640px) and (min-height: 700px) and (orientation: portrait) {
+  .finished-table .boards { grid-template-columns: 1fr; gap: 4px; }
+  .finished-table .player-board {
+    --tile-size: clamp(16px, min(5.6vw, 2.9svh), 28px);
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 2px 10px;
+    padding-inline: 8px;
+  }
+  .finished-table .board-grid { grid-column: 1; grid-row: 2 / span 3; }
+  .finished-table :is(.floor-caption, .floor, .round-score) { grid-column: 2; }
+  .finished-table .floor { --tile-size: min(3.7vw, 18px); flex-wrap: wrap; }
+  .finished-table .round-score { align-self: start; }
 }
 @media (min-width: 540px) and (max-width: 960px) and (max-height: 540px) and (orientation: landscape) {
   .match-layout {
@@ -415,4 +466,83 @@
   .game-tools { margin-top: 2px; }
   .game-tools summary { min-height: 32px; line-height: 32px; }
   .game-tools > .text-button { min-height: 32px; }
+}
+
+/* On a portrait tablet, share the upper row so the playable wall can use the full width. */
+@media (min-width: 641px) and (max-width: 1024px) and (orientation: portrait) {
+  .room-page.playing { width: calc(100% - 28px); padding: 5px 0; }
+  .playing .room-header { flex-wrap: nowrap; gap: 12px; padding-bottom: 4px; }
+  .playing .room-header-game { min-width: 0; }
+  .playing .room-header-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .playing .leave-game { flex: none; }
+  .game-heading { padding: 8px 0; }
+  .game-heading h1 { font-size: clamp(30px, 4vw, 42px); }
+  .match-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .opponent-overview, .match-layout .match-main { display: contents; }
+  .opponent-overview .last-draft { grid-column: 1 / -1; margin: 0; }
+  .match-layout .boards { grid-column: 1 / -1; margin: 0; }
+  .match-layout .draft-help { display: none; }
+  .match-layout :is(.supply, .own, .supply button, .own button) { scroll-margin-top: 0; }
+
+  .match-layout .supply {
+    --tile-size: clamp(30px, min(5.8vw, 6svh - 18px), 56px);
+    grid-column: 2;
+    align-self: stretch;
+    align-content: space-between;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 6px;
+  }
+  .factory-rack { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px 0; }
+  .plate { grid-column: span 2; width: min(100%, max(90px, 2.6 * var(--tile-size) + 4px)); }
+  .plate:nth-child(4) { grid-column: 2 / span 2; }
+  .table-center { flex-direction: row; justify-content: center; align-items: center; gap: 5px; border: 0; border-top: 1px solid var(--border); padding: 4px 0 0; }
+  .center-groups { gap: 2px; }
+  .center-groups .tile-group { min-width: max(36px, var(--tile-size) + 5px); }
+  .center-groups .first-marker { margin: 0; }
+
+  .game-table .player-board {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 5px 8px;
+    padding: 7px 10px;
+    align-items: center;
+  }
+  .match-layout .own { --tile-size: clamp(24px, min(8.5vw, 12svh - 70px), 82px); }
+  .player-board.compact {
+    --tile-size: clamp(18px, min(3.8vw, 6svh - 25px), 40px);
+    grid-column: 1;
+    align-self: stretch;
+    align-content: space-between;
+  }
+  .game-table :is(.board-header, .board-grid, .placement-summary, .round-score) { grid-column: 1 / -1; margin: 0; }
+  .game-table .board-header { padding-bottom: 4px; }
+  .match-layout .placement-summary { padding: 0; }
+  #draft-selection > div, #draft-selection .marker-note { display: inline; margin-left: .5em; }
+  .cancel-hint { display: none; }
+  .compact .board-player { display: block; }
+  .compact .board-header h2 { font-size: 1.2rem; }
+  .game-table .board-grid { grid-row: auto; width: 100%; max-width: none; column-gap: 8px; }
+  .game-table .pattern-row { min-height: calc(var(--tile-size) + 4px); padding-block: 1px; }
+  .game-table .floor-caption { grid-column: 1; grid-row: auto; align-self: center; margin: 0; padding: 0; min-height: 0; border: 0; }
+  .game-table .floor { display: flex; grid-column: 2; grid-row: auto; align-self: center; gap: 3px; margin: 0; }
+  .compact .board-heading { font-size: .75rem; }
+  .compact .row-note, .game-table .floor li { font-size: .72rem; }
+  .game-table .round-score { padding-top: 4px; }
+  .match-layout .own .floor-caption:has(.floor-action) .board-heading { display: none; }
+
+  .finished-table .results { max-width: none; margin-bottom: 6px; padding: 10px 14px; }
+  .finished-table .results table { table-layout: fixed; margin-top: 6px; }
+  .finished-table .results th, .finished-table .results td { padding-block: 3px; line-height: 1.2; }
+  .finished-table .results thead span, .finished-table .board-header h2 {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .finished-table .results .actions { margin-top: 6px; }
+  .finished-table .boards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .finished-table .player-board { --tile-size: clamp(21px, 3.6vw, 37px); padding: 10px; }
+  .finished-table .board-grid { column-gap: 4px; }
+  .game-tools { margin-top: 6px; font-size: .9rem; }
 }
