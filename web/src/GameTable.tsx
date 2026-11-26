@@ -92,7 +92,7 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
     </header>
     {selected && <div className="placement-summary">
       <div id="draft-selection">
-        <strong>{selected.count} {selected.color} {selected.count === 1 ? "tile" : "tiles"}</strong> · {sourceName(selected.source)}
+        <span className="draft-source"><strong>{selected.count} {selected.color} {selected.count === 1 ? "tile" : "tiles"}</strong> · {sourceName(selected.source)}</span>
         <div role="status">{busy ? "Saving your move…" : <>Choose a line or the floor.<span className="cancel-hint"> Click elsewhere to cancel.</span></>}</div>
         {previewMarker && <span className="marker-note">{firstPlayerNote(player.floor.length)}</span>}
       </div>

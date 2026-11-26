@@ -268,12 +268,39 @@
   .match-layout .boards .player-board { --tile-size: clamp(17px, 5vw, 22px); }
   .match-layout .boards .pattern-row { min-height: max(24px, var(--tile-size) + 3px); padding-block: 0; }
 }
-/* Keep the five factories in view as Safari's address bar changes height. */
+/* Center the first two factories over the three in the lower row. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .match-layout .factory-rack .plate { grid-column: span 2; margin: 0; }
+  .match-layout .factory-rack .plate:first-child { grid-column: 2 / span 2; }
+  .match-layout .factory-rack .plate:nth-child(2) { grid-column: 4 / span 2; }
+}
 @media (max-width: 640px) and (min-height: 700px) and (orientation: portrait) {
   .match-layout .supply {
     --factory-size: min(92px, 10svh, (100vw - 34px) / 5);
     --tile-size: min(35px, var(--factory-size) * .38);
+    --center-target: clamp(32px, min(10vw, var(--factory-size) * .53), 44px);
+    grid-template-columns: minmax(0, 1fr) calc(2 * var(--center-target) + 9px);
+    gap: 6px;
+    padding: 6px;
   }
+  .match-layout .factory-rack {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    align-self: start;
+    row-gap: 2px;
+    width: 100%;
+  }
+  .match-layout .table-center {
+    grid-column: 2;
+    flex-direction: column;
+    justify-content: center;
+    width: auto;
+    padding-inline-start: 6px;
+    border: 0;
+    border-inline-start: 1px solid var(--border);
+  }
+  .match-layout .center-groups { grid-template-columns: repeat(2, var(--center-target)); align-items: center; justify-items: center; }
+  .match-layout .center-groups > :only-child { grid-column: 1 / -1; }
   .match-layout .plate .tile-group {
     width: calc(var(--factory-size) / 2 - 1px);
     height: calc(var(--factory-size) / 2 - 1px);
@@ -282,12 +309,12 @@
   }
   .match-layout .plate .tile-group:nth-child(even) { justify-items: start; }
   .match-layout .plate .tile-group:is(:only-child, :nth-child(3):last-child) { justify-items: center; }
-  .match-layout .center-groups .tile-group { min-width: 40px; min-height: 40px; }
+  .match-layout .center-groups .tile-group { min-width: var(--center-target); min-height: var(--center-target); }
   .match-layout .boards .own { --tile-size: clamp(22px, 11svh - 53px, min((100vw - 94px) / 10, 36px)); }
   .player-board.compact {
     --tile-size: clamp(15px, min(4.4vw, 2.3svh), 21px);
     grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: 1fr auto 1fr;
+    grid-template-rows: 1fr auto auto;
     column-gap: clamp(10px, 3vw, 18px);
     padding-inline: 8px;
   }
@@ -315,8 +342,36 @@
   .game-heading { padding-block: 2px; }
   .game-heading h1 { font-size: 1.6rem; }
   .opponent-overview { padding-top: 0; }
-  .match-layout { gap: 4px; }
-  .match-layout .boards { margin-top: 4px; }
+  .match-layout { gap: 8px; }
+  .match-layout .boards { margin-top: 8px; }
+  .match-layout .own .board-header { padding-bottom: 4px; }
+  .match-layout .own .board-grid { row-gap: 2px; }
+  .match-layout .own:has(.placement-summary) .board-grid { row-gap: clamp(0px, 4svh - 28px, 2px); }
+  /* Keep the selection beside the player's score so all five destination rows stay in reach. */
+  .match-layout .own:has(.placement-summary) .board-header {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: column;
+    align-items: start;
+    gap: 0;
+    width: 6rem;
+    padding: 0;
+    border: 0;
+  }
+  .match-layout .own .board-player { max-width: 100%; }
+  .match-layout .placement-summary {
+    grid-column: 2;
+    grid-row: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 4px;
+    font-size: .75rem;
+    line-height: 1.2;
+  }
+  .match-layout #draft-selection { display: contents; }
+  .match-layout .draft-source { grid-column: 1; grid-row: 1; }
+  .match-layout .change-tiles { grid-column: 2; grid-row: 1; min-height: 26px; padding: 2px; }
+  .match-layout #draft-selection > :is([role="status"], .marker-note) { grid-column: 1 / -1; }
   .game-tools summary { min-height: var(--table-control-height); line-height: var(--table-control-height); }
   .game-tools > .text-button { min-height: var(--table-control-height); }
 }
@@ -350,9 +405,6 @@
     gap: 1px 0;
     padding: 1px;
   }
-  .match-layout .plate:nth-child(n) { grid-column: span 2; margin: 0; }
-  .match-layout .plate:nth-child(4) { grid-row: 2; grid-column: 2 / span 2; }
-  .match-layout .plate:nth-child(5) { grid-row: 2; grid-column: 4 / span 2; }
   .match-layout .table-center { flex-direction: column; gap: 0; }
   .match-layout .center-groups { gap: 0; }
   .match-layout .center-groups .tile-group { min-width: 24px; min-height: 24px; }
