@@ -76,8 +76,8 @@ function Supply({ game, active, selected, onPick }: {
   </section>;
 }
 
-function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round, compact = false }: {
-  player: Board; seat: number; own: boolean; name: string; selected: Pick | null; legalMoves: Move[];
+function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round, compact = false }: {
+  player: Board; anticipatedScore?: number; seat: number; own: boolean; name: string; selected: Pick | null; legalMoves: Move[];
   previewMarker: boolean; busy: boolean;
   onPlace: (row: number, clickCount: number) => void; onChangeTiles: () => void; previous?: RoundScore; round?: number; compact?: boolean;
 }) {
@@ -88,7 +88,10 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
       <div className="board-player">{compact && <span className="opponent-label">Opponent</span>}
         <h2 title={name}>{name} {own && <small>You</small>}</h2>
       </div>
-      <p className="points"><strong>{player.score}</strong> pts</p>
+      <p className="points"><strong>{player.score}</strong><span className="sr-only"> points</span>{anticipatedScore !== undefined && <>{" "}
+        <span className="score-preview" title="Current score plus bonuses already earned on the wall" aria-hidden="true">({anticipatedScore})</span>
+        <span className="sr-only">, {anticipatedScore} points including current wall bonuses</span>
+      </>}<span aria-hidden="true"> pts</span></p>
     </header>
     {selected && <div className="placement-summary">
       <div id="draft-selection">
@@ -262,6 +265,7 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
   </p>;
   const renderBoard = (seat: number, compact = false) =>
     <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
+      anticipatedScore={game.finished ? undefined : game.anticipatedScores?.[seat - 1]}
       selected={seat === room.yourSeat ? selected : null} previewMarker={seat === room.yourSeat && takesMarker} legalMoves={game.legalMoves}
       busy={busy} onPlace={place} onChangeTiles={changeTiles} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} compact={compact} />;
   return <div ref={table} className="game-table" data-game-revision={game.revision} data-turn={game.turn}
@@ -301,6 +305,7 @@ export function PlayGuide() {
         <li>Choose one pattern line or the floor. A line holds one color and its wall row must still have room for that color. Extra tiles go to the floor.</li>
         <li>When the displays empty, each full line adds one tile to your wall. An isolated tile scores one point. Otherwise, score the length of each connected horizontal and vertical run through it. Floor spaces deduct the printed points.</li>
         <li>A complete wall row ends the game after scoring that round. Each full row earns 2 bonus points, each full column 7, and five tiles of one color 10. Tied scores go to the player with more complete rows, then to a shared win.</li>
+        <li>The score in brackets includes end-game bonuses from tiles already on your wall, but not pending placements or floor penalties.</li>
       </ol>
       <a href="https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf" target="_blank" rel="noreferrer">Publisher’s rulebook</a>
     </div>
