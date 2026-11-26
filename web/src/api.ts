@@ -94,6 +94,7 @@ export type Game = {
   center: Color[];
   markerInCenter: boolean;
   players: Board[];
+  anticipatedScores: [number, number];
   winners: number[];
   legalMoves: Move[];
   lastMove?: (Move & { seat: number; count: number }) | null;

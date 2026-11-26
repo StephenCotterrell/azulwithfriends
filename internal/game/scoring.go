@@ -1,5 +1,9 @@
 package game
 
+func (b Bonus) total() int {
+	return b.Rows + b.Columns + b.Colors
+}
+
 var floorCosts = [...]int{1, 1, 2, 2, 2, 3, 3}
 
 func (s *State) finishRound() {
@@ -18,7 +22,7 @@ func (s *State) finishRound() {
 	for i, bonus := range bonuses {
 		p := &s.Players[i]
 		p.Bonus = bonus
-		p.Score += bonus.Rows + bonus.Columns + bonus.Colors
+		p.Score += bonus.total()
 	}
 	s.Turn = 0
 	s.Finished = true

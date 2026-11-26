@@ -80,7 +80,8 @@ type State struct {
 
 type View struct {
 	Table
-	LegalMoves []Move `json:"legalMoves"`
+	LegalMoves        []Move `json:"legalMoves"`
+	AnticipatedScores [2]int `json:"anticipatedScores"` // Seat order; includes only bonuses on the current wall.
 }
 
 func New() State {
@@ -139,7 +140,12 @@ func (s State) View() View {
 	for i, factory := range t.Factories {
 		t.Factories[i] = append([]string{}, factory...)
 	}
+	view := View{LegalMoves: s.legalMoves()}
 	for i, p := range t.Players {
+		view.AnticipatedScores[i] = p.Score
+		if !t.Finished {
+			view.AnticipatedScores[i] += p.wallBonus().total()
+		}
 		t.Players[i].Floor = append([]string{}, p.Floor...)
 	}
 	if t.LastRound != nil {
@@ -150,7 +156,8 @@ func (s State) View() View {
 		last := *t.LastMove
 		t.LastMove = &last
 	}
-	return View{Table: t, LegalMoves: s.legalMoves()}
+	view.Table = t
+	return view
 }
 
 func (s *State) source(n int) []string {

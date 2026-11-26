@@ -108,7 +108,7 @@ func projectBoard(p Player) boardProjection {
 	var round State
 	round.tileWall(&p)
 	bonus := p.wallBonus()
-	projected := boardProjection{score: p.Score + bonus.Rows + bonus.Columns + bonus.Colors, rowBonus: bonus.Rows}
+	projected := boardProjection{score: p.Score + bonus.total(), rowBonus: bonus.Rows}
 	for row, line := range p.Lines {
 		if line.Count > 0 {
 			column := wallColumn(row, colorIndex(line.Color))

@@ -292,3 +292,35 @@ func encoded(t *testing.T, v any) string {
 	}
 	return string(b)
 }
+
+func TestAnticipatedScores(t *testing.T) {
+	s := State{Table: Table{Round: 5, Turn: 1}}
+	p, other := &s.Players[0], &s.Players[1]
+	p.Score, other.Score = 5, 4
+	for i := range 5 {
+		p.Wall[4][i] = true       // Full row.
+		p.Wall[i][4] = true       // Full column.
+		p.Wall[i][i] = true       // Full set of blue tiles.
+		other.Wall[i][0] = i != 4 // Incomplete column.
+	}
+	other.Lines[4] = Line{"yellow", 5} // Would fill the column during wall tiling.
+	other.Floor = []string{firstMarker, "red"}
+	before := encoded(t, s)
+	view := s.View()
+	if view.AnticipatedScores != [2]int{24, 4} || view.Players[0].Score != 5 || view.Players[0].Bonus != (Bonus{}) {
+		t.Fatalf("wrong preview or live score: %+v", view)
+	}
+	if encoded(t, s) != before {
+		t.Fatal("view changed the saved state")
+	}
+	var decoded View
+	if err := json.Unmarshal([]byte(encoded(t, view)), &decoded); err != nil || decoded.AnticipatedScores != view.AnticipatedScores {
+		t.Fatalf("invalid JSON preview: %+v, %v", decoded.AnticipatedScores, err)
+	}
+	s.finishRound()
+	finished := s.View()
+	want := [2]int{s.Players[0].Score, s.Players[1].Score}
+	if !s.Finished || finished.AnticipatedScores != want {
+		t.Fatalf("finished preview must not double-count bonuses: got %v, want %v", finished.AnticipatedScores, want)
+	}
+}
