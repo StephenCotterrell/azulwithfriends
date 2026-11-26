@@ -76,13 +76,23 @@ function Supply({ game, active, selected, onPick }: {
   </section>;
 }
 
-function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round, compact = false }: {
+function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round, compact = false, alignedFloor = false }: {
   player: Board; anticipatedScore?: number; seat: number; own: boolean; name: string; selected: Pick | null; legalMoves: Move[];
   previewMarker: boolean; busy: boolean;
-  onPlace: (row: number, clickCount: number) => void; onChangeTiles: () => void; previous?: RoundScore; round?: number; compact?: boolean;
+  onPlace: (row: number, clickCount: number) => void; onChangeTiles: () => void; previous?: RoundScore; round?: number; compact?: boolean; alignedFloor?: boolean;
 }) {
   const allowed = (row: number) => own && !!selected && legalMoves.some(move =>
     move.source === selected.source && move.color === selected.color && move.row === row);
+  const floorHeading = <h3 className="board-heading">Floor</h3>;
+  const floor = <ol className="floor" aria-label="Floor penalties">{floorCosts.map((cost, index) => {
+      const preview = previewMarker && index === player.floor.length;
+      const tile = preview ? "first" : player.floor[index];
+      const label = tile === "first" ? "first-player marker" : tile ?? "empty";
+      return <li key={index}>
+        <span className="sr-only">Floor space {index + 1}, {preview && "preview of "}{label}, minus {cost}</span>
+        <Ceramic color={tile} preview={preview} /><span aria-hidden="true">−{cost}</span>
+      </li>;
+    })}</ol>;
   return <section className={`player-board${own ? " own" : ""}${compact ? " compact" : ""}`} aria-label={`${name}, seat ${seat}${compact ? ", opponent board" : ""}`}>
     <header className="board-header">
       <div className="board-player">{compact && <span className="opponent-label">Opponent</span>}
@@ -101,7 +111,7 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
       </div>
       <button type="button" className="text-button change-tiles" disabled={busy} onClick={onChangeTiles}>Change tiles</button>
     </div>}
-    <div className="board-grid">
+    <div className={`board-grid${alignedFloor ? " aligned-floor-grid" : ""}`}>
       {player.lines.map((line, index) => {
         const row = index + 1;
         const enabled = allowed(row);
@@ -135,20 +145,13 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
           </div>
         </div>;
       })}
+      {alignedFloor && <>
+        <div className="aligned-floor-strip">{floorHeading}{floor}</div>
+        {own && selected && <button type="button" className="floor-action aligned-floor-action" data-row={0} disabled={!allowed(0) || busy}
+          aria-describedby="draft-selection" onClick={event => onPlace(0, event.detail)}>Place on floor</button>}
+      </>}
     </div>
-    <div className="floor-caption"><h3 className="board-heading">Floor line</h3>
-      {own && selected && <button type="button" className="floor-action" data-row={0} disabled={!allowed(0) || busy}
-        aria-describedby="draft-selection" onClick={event => onPlace(0, event.detail)}>Place on floor</button>}
-    </div>
-    <ol className="floor" aria-label="Floor penalties">{floorCosts.map((cost, index) => {
-      const preview = previewMarker && index === player.floor.length;
-      const tile = preview ? "first" : player.floor[index];
-      const label = tile === "first" ? "first-player marker" : tile ?? "empty";
-      return <li key={index}>
-        <span className="sr-only">Floor space {index + 1}, {preview && "preview of "}{label}, minus {cost}</span>
-        <Ceramic color={tile} preview={preview} /><span aria-hidden="true">−{cost}</span>
-      </li>;
-    })}</ol>
+    {!alignedFloor && <><div className="floor-caption">{floorHeading}</div>{floor}</>}
     {previous && !compact && <p className="round-score">Round {round} <span>+{previous.wall} wall</span><span>−{previous.penalty} floor</span></p>}
   </section>;
 }
@@ -265,7 +268,7 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
   </p>;
   const renderBoard = (seat: number, compact = false) =>
     <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
-      anticipatedScore={game.finished ? undefined : game.anticipatedScores?.[seat - 1]}
+      anticipatedScore={game.finished ? undefined : game.anticipatedScores?.[seat - 1]} alignedFloor={!game.finished && seat === room.yourSeat}
       selected={seat === room.yourSeat ? selected : null} previewMarker={seat === room.yourSeat && takesMarker} legalMoves={game.legalMoves}
       busy={busy} onPlace={place} onChangeTiles={changeTiles} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} compact={compact} />;
   return <div ref={table} className="game-table" data-game-revision={game.revision} data-turn={game.turn}
