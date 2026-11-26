@@ -153,7 +153,6 @@ a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .room-header a { display: inline-flex; align-items: center; gap: .22em; min-height: 44px; color: var(--text-heading); text-decoration: none; font: 1.45rem Georgia, serif; }
 button.copy-room-name { background: transparent; color: inherit; padding: 0; border: 0; min-width: 0; max-width: 100%; font: inherit; letter-spacing: inherit; text-align: left; }
 button.copy-room-name:hover { background: transparent; text-decoration: underline; text-underline-offset: .16em; }
-button.room-header-name { overflow-wrap: anywhere; color: var(--text-muted); font-size: .92rem; }
 .copy-room-dialog input { margin-top: 8px; }
 .room-copy-toast {
   position: fixed; z-index: 20; inset-inline-start: 50%; transform: translateX(-50%);
@@ -163,7 +162,6 @@ button.room-header-name { overflow-wrap: anywhere; color: var(--text-muted); fon
   font-size: .88rem; font-weight: 600;
 }
 .room-header .theme-toggle { margin-left: auto; }
-.room-header-game { display: flex; align-items: center; gap: 12px; }
 .room-header img { margin-right: 9px; }
 .room-header em { color: var(--text-accent); }
 .room-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .96fr); gap: clamp(40px, 8vw, 108px); align-items: start; padding-top: clamp(44px, 9vw, 120px); }
@@ -208,5 +206,4 @@ button.room-header-name { overflow-wrap: anywhere; color: var(--text-muted); fon
 }
 @media (max-width: 640px) {
   .room-header { row-gap: 4px; }
-  .room-header-game { width: 100%; justify-content: space-between; }
 }
