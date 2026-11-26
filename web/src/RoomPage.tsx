@@ -333,7 +333,7 @@ export function RoomPage({ id }: { id: string }) {
       <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
         <ThemeToggle />
         {room?.game && <div className="room-header-game">
-          <span className="room-header-name">{roomName(room.slug)}</span>
+          <span className="room-header-name" title={title}>{title}</span>
           {closeRoomPath && <button type="button" className="secondary leave-game" disabled={!!pending}
             onClick={() => { setActionError(""); setConfirmClose(true); }}>Leave game</button>}
         </div>}
@@ -350,9 +350,12 @@ export function RoomPage({ id }: { id: string }) {
           } : undefined} />
         <div className="game-tools">
           <PlayGuide />
-          <details className="room-settings"><summary>{bot ? "Room settings" : "Room and invite"}</summary>
-            {!bot && <InviteLink url={inviteURL(room.slug)} />}
-            <GuestPanel onSaved={refresh} />
+          <details className="room-settings" name="game-tools"><summary>{bot ? "Room settings" : "Room and invite"}</summary>
+            <div className="game-tool-panel">
+              <p className="settings-room-name">{title}</p>
+              {!bot && <InviteLink url={inviteURL(room.slug)} />}
+              <GuestPanel onSaved={refresh} />
+            </div>
           </details>
           <button type="button" className="text-button" onClick={refresh}>Refresh table</button>
         </div>

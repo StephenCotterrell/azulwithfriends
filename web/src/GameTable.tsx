@@ -7,9 +7,9 @@ const sourceName = (source: number) => source === 0 ? "Center" : `Factory ${sour
 
 function firstPlayerNote(floorSize: number) {
   if (floorSize >= floorCosts.length) {
-    return "Your floor is full. You take the first-player marker at no extra cost and start next round.";
+    return "Free marker. You start next round.";
   }
-  return `First-player marker on floor space ${floorSize + 1} (−${floorCosts[floorSize]}). You start next round.`;
+  return `Marker −${floorCosts[floorSize]}. You start next round.`;
 }
 
 function TilePatterns() {
@@ -93,7 +93,7 @@ function PlayerBoard({ player, seat, own, name, selected, previewMarker, busy, l
     {selected && <div className="placement-summary">
       <div id="draft-selection">
         <strong>{selected.count} {selected.color} {selected.count === 1 ? "tile" : "tiles"}</strong> · {sourceName(selected.source)}
-        <div role="status">{busy ? "Saving your move…" : "Choose a line or the floor. Click elsewhere to cancel."}</div>
+        <div role="status">{busy ? "Saving your move…" : <>Choose a line or the floor.<span className="cancel-hint"> Click elsewhere to cancel.</span></>}</div>
         {previewMarker && <span className="marker-note">{firstPlayerNote(player.floor.length)}</span>}
       </div>
       <button type="button" className="text-button change-tiles" disabled={busy} onClick={onChangeTiles}>Change tiles</button>
@@ -160,7 +160,7 @@ function Results({ game, name, yourSeat, busy, rematch }: {
     <h2>{tied ? "Shared victory" : winner === yourSeat ? "You win!" : `${name(winner)} wins`}</h2>
     {equalPoints && <p>{tied ? "Both players tied on points and completed rows." : "Completed horizontal rows decided the tie."}</p>}
     <table><caption className="sr-only">Scoring breakdown</caption><thead><tr><th scope="col">Points</th>
-      {[1,2].map(seat => <th key={seat} scope="col">{name(seat)}</th>)}</tr></thead>
+      {[1,2].map(seat => <th key={seat} scope="col"><span title={name(seat)}>{name(seat)}</span></th>)}</tr></thead>
       <tbody>{(["Wall & floor", "Row bonuses", "Column bonuses", "Color bonuses", "Total"] as const).map((label, index) =>
         <tr key={label}><th scope="row">{label}</th>{game.players.map((p, seat) => {
           const { rows, columns, colors } = p.bonus;
@@ -252,6 +252,12 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
     onMove({ source: selected.source, color: selected.color, row, revision: selected.revision });
   }
   const status = game.turn === room.yourSeat ? "Your turn" : `${name(game.turn)}’s turn`;
+  const lastMove = game.lastMove;
+  const lastDrafter = room.seats.find(seat => seat.number === lastMove?.seat);
+  const lastDraft = lastMove && <p className="last-draft" role="status">
+    <strong>Last draft</strong> {lastDrafter?.displayName ?? name(lastMove.seat)} took {lastMove.count} {lastMove.color}{" "}
+    from {lastMove.source === 0 ? "the center" : sourceName(lastMove.source)} for {lastMove.row ? `line ${lastMove.row}` : "the floor"}.
+  </p>;
   const renderBoard = (seat: number, compact = false) =>
     <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
       selected={seat === room.yourSeat ? selected : null} previewMarker={seat === room.yourSeat && takesMarker} legalMoves={game.legalMoves}
@@ -263,10 +269,11 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
     }}>
     <TilePatterns />
     <div className="game-heading"><h1 ref={heading} tabIndex={-1}>{game.finished ? "Final scores" : `Round ${game.round}`}</h1>
-      {!game.finished && <p className="turn" role="status"><i className={game.turn === room.yourSeat ? "active" : ""} />{status}</p>}
+      {!game.finished && <p className="turn" role="status"><i className={game.turn === room.yourSeat ? "active" : ""} /><span title={status}>{status}</span></p>}
     </div>
     <div className={game.finished ? "finished-table" : "match-layout"}>
       {!game.finished && <aside ref={opponent} className="opponent-overview" aria-label="Opponent overview">
+        {lastDraft}
         {renderBoard(3 - room.yourSeat, true)}
       </aside>}
       <div className="match-main">
@@ -277,7 +284,7 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
           }} />
           <div className="draft-help" role="status">{active && !selected ? "Choose a tile color." : null}</div>
         </>}
-        {game.lastMove && <p className="last-draft" role="status"><strong>Last draft</strong> {name(game.lastMove.seat)} took {game.lastMove.count} {game.lastMove.color} from {game.lastMove.source === 0 ? "the center" : sourceName(game.lastMove.source)} for {game.lastMove.row ? `line ${game.lastMove.row}` : "the floor"}.</p>}
+        {game.finished && lastDraft}
         <div className="boards">{(game.finished ? [room.yourSeat, 3 - room.yourSeat] : [room.yourSeat]).map(seat => renderBoard(seat))}</div>
       </div>
     </div>
@@ -285,13 +292,15 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
 }
 
 export function PlayGuide() {
-  return <details className="play-guide"><summary>How to play</summary>
-    <ol>
-      <li>Take every tile of one color from a factory or the center. A factory’s other tiles move to the center. The first center draft also puts the start marker on your floor and gives you first turn next round.</li>
-      <li>Choose one pattern line or the floor. A line holds one color and its wall row must still have room for that color. Extra tiles go to the floor.</li>
-      <li>When the displays empty, each full line adds one tile to your wall. An isolated tile scores one point. Otherwise, score the length of each connected horizontal and vertical run through it. Floor spaces deduct the printed points.</li>
-      <li>A complete wall row ends the game after scoring that round. Each full row earns 2 bonus points, each full column 7, and five tiles of one color 10. Tied scores go to the player with more complete rows, then to a shared win.</li>
-    </ol>
-    <a href="https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf" target="_blank" rel="noreferrer">Publisher’s rulebook</a>
+  return <details className="play-guide" name="game-tools"><summary>How to play</summary>
+    <div className="game-tool-panel">
+      <ol>
+        <li>Take every tile of one color from a factory or the center. A factory’s other tiles move to the center. The first center draft also puts the start marker on your floor and gives you first turn next round.</li>
+        <li>Choose one pattern line or the floor. A line holds one color and its wall row must still have room for that color. Extra tiles go to the floor.</li>
+        <li>When the displays empty, each full line adds one tile to your wall. An isolated tile scores one point. Otherwise, score the length of each connected horizontal and vertical run through it. Floor spaces deduct the printed points.</li>
+        <li>A complete wall row ends the game after scoring that round. Each full row earns 2 bonus points, each full column 7, and five tiles of one color 10. Tied scores go to the player with more complete rows, then to a shared win.</li>
+      </ol>
+      <a href="https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf" target="_blank" rel="noreferrer">Publisher’s rulebook</a>
+    </div>
   </details>;
 }
