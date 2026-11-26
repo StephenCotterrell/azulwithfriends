@@ -155,6 +155,13 @@ button.copy-room-name { background: transparent; color: inherit; padding: 0; bor
 button.copy-room-name:hover { background: transparent; text-decoration: underline; text-underline-offset: .16em; }
 button.room-header-name { overflow-wrap: anywhere; color: var(--text-muted); font-size: .92rem; }
 .copy-room-dialog input { margin-top: 8px; }
+.room-copy-toast {
+  position: fixed; z-index: 20; inset-inline-start: 50%; transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none; padding: 8px 14px; border: 1px solid var(--border-control);
+  border-radius: 6px; background: var(--surface); color: var(--text-heading);
+  font-size: .88rem; font-weight: 600;
+}
 .room-header .theme-toggle { margin-left: auto; }
 .room-header-game { display: flex; align-items: center; gap: 12px; }
 .room-header img { margin-right: 9px; }
