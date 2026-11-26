@@ -107,14 +107,17 @@ function CopyRoomName({ name, url, className }: { name: string; url: string; cla
 
   return <>
     <button type="button" className={`copy-room-name ${className ?? ""}`} onClick={copy}
-      title="Copy room link" aria-label={`Copy room link for ${name}`}>{copied ? "Copied!" : name}</button>
+      title="Copy room link" aria-label={`Copy room link for ${name}`}>{name}</button>
     <span className="sr-only" role="status">{copied ? "Room link copied." : ""}</span>
-    {createPortal(<dialog className="close-room-dialog copy-room-dialog" ref={fallback} aria-label="Copy room link manually">
-      <label className="field-label">Copy this room link
-        <input readOnly value={url} autoFocus onFocus={event => event.currentTarget.select()} />
-      </label>
-      <button type="button" className="secondary" onClick={() => fallback.current?.close()}>Done</button>
-    </dialog>, document.body)}
+    {createPortal(<>
+      {copied && <div className="room-copy-toast" aria-hidden="true">Copied!</div>}
+      <dialog className="close-room-dialog copy-room-dialog" ref={fallback} aria-label="Copy room link manually">
+        <label className="field-label">Copy this room link
+          <input readOnly value={url} autoFocus onFocus={event => event.currentTarget.select()} />
+        </label>
+        <button type="button" className="secondary" onClick={() => fallback.current?.close()}>Done</button>
+      </dialog>
+    </>, document.body)}
   </>;
 }
 
