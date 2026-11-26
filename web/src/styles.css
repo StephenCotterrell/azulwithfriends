@@ -45,6 +45,8 @@ h1 em {
   color: var(--text-accent);
 }
 .entry-panel { margin-top: clamp(32px, 4.6vw, 65px); max-width: 377px; }
+.solo-entry { margin-bottom: 22px; }
+.solo-entry > button { width: 100%; }
 .resume-game {
   display: grid; gap: 3px; padding: 11px 16px; margin-bottom: 22px;
   border: 1px solid var(--border); border-radius: 6px;

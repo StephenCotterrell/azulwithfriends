@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { GuestPanel } from "./GuestPanel";
 import { Lobby } from "./Lobby";
@@ -12,6 +12,9 @@ function Welcome() {
   const [entering, setEntering] = useState<string | null>(null);
   const [savingName, setSavingName] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [soloError, setSoloError] = useState("");
+  const roomWrite = useRef(false);
+  const soloAttempt = useRef<string | null>(null);
   const [joinError, setJoinError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [resumeGame, setResumeGame] = useState<string | null>(null);
@@ -19,28 +22,56 @@ function Welcome() {
 
   useEffect(() => {
     function onShow(event: PageTransitionEvent) {
-      if (event.persisted) setEntering(null);
+      if (event.persisted) {
+        roomWrite.current = false;
+        setEntering(null);
+      }
     }
     window.addEventListener("pageshow", onShow);
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
+  function beginEntry(target: string) {
+    if (busy || roomWrite.current) return false;
+    roomWrite.current = true;
+    setEntering(target);
+    return true;
+  }
+
+  function finishEntry() {
+    roomWrite.current = false;
+    setEntering(null);
+  }
+
+  async function playComputer() {
+    if (!beginEntry("solo")) return;
+    setSoloError("");
+    try {
+      const id = soloAttempt.current ??= crypto.randomUUID();
+      const room = await postJSON<Room>("/api/solo-games", { id });
+      soloAttempt.current = null;
+      window.location.assign(roomPath(room.slug));
+    } catch (cause) {
+      if (cause instanceof APIError && cause.status === 409) soloAttempt.current = null;
+      setSoloError(cause instanceof Error ? cause.message : "Couldn’t start the game. Try again.");
+      finishEntry();
+    }
+  }
+
   async function createRoom() {
-    if (busy) return;
-    setEntering("create");
+    if (!beginEntry("create")) return;
     setCreateError("");
     try {
       const room = await postJSON<Room>("/api/rooms", { listed });
       window.location.assign(roomPath(room.slug));
     } catch (cause) {
       setCreateError(cause instanceof Error ? cause.message : "Couldn’t create the room. Try again.");
-      setEntering(null);
+      finishEntry();
     }
   }
 
   async function joinRoom(slug: string) {
-    if (busy) return;
-    setEntering(slug);
+    if (!beginEntry(slug)) return;
     setJoinError("");
     const path = `/api/rooms/${encodeURIComponent(slug)}`;
     try {
@@ -57,7 +88,7 @@ function Welcome() {
       }
       setJoinError(cause instanceof Error ? cause.message : "Couldn’t join the room. Try again.");
       setRefreshKey(value => value + 1);
-      setEntering(null);
+      finishEntry();
     }
   }
 
@@ -71,6 +102,13 @@ function Welcome() {
         </div>
         <h1>Azul <em>with friends</em></h1>
         <div className="entry-panel">
+          <div className="solo-entry">
+            <button type="button" onClick={playComputer} disabled={busy}>
+              {entering === "solo" ? "Starting game…" : "Play the computer"}
+            </button>
+            <span className="sr-only" role="status">{entering === "solo" && "Starting a game against the computer."}</span>
+            {soloError && <p className="error" role="alert">{soloError}</p>}
+          </div>
           {resumeGame && <a className="resume-game" href={busy ? undefined : roomPath(resumeGame)} aria-disabled={busy || undefined}>
             <strong>Resume game</strong>
             <span>{roomName(resumeGame)}</span>
@@ -83,7 +121,7 @@ function Welcome() {
             </div>
           </fieldset>
           <p className="hint visibility-hint">{listed ? "Listed for one hour." : "Share the link with a friend, or add a bot."}</p>
-          <button type="button" onClick={createRoom} disabled={busy}>{entering === "create" ? "Creating room…" : "Create a room"}</button>
+          <button type="button" className="secondary" onClick={createRoom} disabled={busy}>{entering === "create" ? "Creating room…" : "Create a room"}</button>
           {createError && <p className="error" role="alert">{createError}</p>}
           <GuestPanel disabled={entering !== null} onSaving={setSavingName} onSaved={() => setRefreshKey(value => value + 1)} />
         </div>

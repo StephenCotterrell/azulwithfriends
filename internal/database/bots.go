@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/StephenCotterrell/azulwithfriends/internal/game"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -49,7 +50,7 @@ func SetRoomBot(ctx context.Context, pool *pgxpool.Pool, key string, sessionHash
 		if level == "" {
 			level = game.BotCompetitive
 		}
-		_, err = tx.Exec(ctx, "INSERT INTO room_seats (room_id, number, is_bot, bot_level) VALUES ($1, 2, true, $2)", room.ID, level)
+		err = insertBotSeat(ctx, tx, room.ID, level)
 	}
 	if err != nil {
 		return Room{}, err
@@ -63,6 +64,11 @@ func SetRoomBot(ctx context.Context, pool *pgxpool.Pool, key string, sessionHash
 		return Room{}, err
 	}
 	return room, nil
+}
+
+func insertBotSeat(ctx context.Context, tx pgx.Tx, roomID string, level game.BotLevel) error {
+	_, err := tx.Exec(ctx, "INSERT INTO room_seats (room_id, number, is_bot, bot_level) VALUES ($1, 2, true, $2)", roomID, level)
+	return err
 }
 
 // CloseBotGame permanently removes the room and its seats while preserving

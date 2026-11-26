@@ -47,6 +47,7 @@ func New(db *pgxpool.Pool, dist string, secureCookies bool) http.Handler {
 	mux.HandleFunc("POST /api/session", a.saveSession)
 	mux.HandleFunc("GET /api/me", a.me)
 	mux.HandleFunc("GET /api/lobby", a.lobby)
+	mux.HandleFunc("POST /api/solo-games", a.createSoloGame)
 	mux.HandleFunc("POST /api/rooms", a.saveRoom)
 	mux.HandleFunc("GET /api/rooms/{id}", a.getRoom)
 	mux.HandleFunc("POST /api/rooms/{id}/join", a.saveRoom)

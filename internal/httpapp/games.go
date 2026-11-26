@@ -10,6 +10,36 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func (a *app) createSoloGame(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		ID string `json:"id"`
+	}
+	if !a.readJSON(w, r, &input) {
+		return
+	}
+	if !roomIDPattern.MatchString(input.ID) {
+		problem(w, http.StatusBadRequest, "Send a valid game request ID.")
+		return
+	}
+	if !a.allowRoomWrite(w) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	cookie, hash := a.newGuestCookie()
+	session := database.RoomSession{ExistingHash: a.sessionHash(r), NewHash: hash, ExpiresAt: cookie.Expires}
+	room, newSession, err := database.CreateSoloGame(ctx, a.db, input.ID, session)
+	if err != nil {
+		roomError(w, err)
+		return
+	}
+	if newSession {
+		http.SetCookie(w, cookie)
+	}
+	w.Header().Set("Location", "/room/"+room.Slug)
+	writeJSON(w, http.StatusCreated, room)
+}
+
 func (a *app) startGame(w http.ResponseWriter, r *http.Request) {
 	if !a.readEmptyObject(w, r) {
 		return

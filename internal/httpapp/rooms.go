@@ -79,9 +79,7 @@ func (a *app) saveRoom(w http.ResponseWriter, r *http.Request) {
 		roomError(w, pgx.ErrNoRows)
 		return
 	}
-	if !a.allowCreation(time.Now()) {
-		w.Header().Set("Retry-After", "60")
-		problem(w, http.StatusTooManyRequests, "Too many requests. Try again in a minute.")
+	if !a.allowRoomWrite(w) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
@@ -109,6 +107,15 @@ func (a *app) saveRoom(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Location", "/room/"+room.Slug)
 	}
 	writeJSON(w, status, room)
+}
+
+func (a *app) allowRoomWrite(w http.ResponseWriter) bool {
+	if a.allowCreation(time.Now()) {
+		return true
+	}
+	w.Header().Set("Retry-After", "60")
+	problem(w, http.StatusTooManyRequests, "Too many requests. Try again in a minute.")
+	return false
 }
 
 func (a *app) setRoomListing(w http.ResponseWriter, r *http.Request) {
@@ -205,7 +212,8 @@ func roomError(w http.ResponseWriter, err error) {
 		problem(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, database.ErrNotListed), errors.Is(err, database.ErrNeedPlayers), errors.Is(err, database.ErrNotStarted),
 		errors.Is(err, database.ErrStaleMove), errors.Is(err, database.ErrIllegalMove), errors.Is(err, database.ErrGameStarted),
-		errors.Is(err, database.ErrNeedBotGame), errors.Is(err, database.ErrRematchUnavailable), errors.Is(err, database.ErrStaleRematch):
+		errors.Is(err, database.ErrNeedBotGame), errors.Is(err, database.ErrRematchUnavailable), errors.Is(err, database.ErrStaleRematch),
+		errors.Is(err, database.ErrSoloStartConflict):
 		problem(w, http.StatusConflict, err.Error())
 	default:
 		slog.Error("room database request failed", "error", err)
