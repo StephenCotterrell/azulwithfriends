@@ -594,3 +594,27 @@
   .finished-table .board-grid { column-gap: 4px; }
   .game-tools { margin-top: 6px; font-size: .9rem; }
 }
+
+
+/* Keep the penalty strip on the same grid as the five-slot pattern line. */
+.aligned-floor-grid { --pattern-gap: 2px; --pattern-inset: 2px; }
+.aligned-floor-grid .pattern-row {
+  gap: var(--pattern-gap);
+  padding-inline: calc(var(--pattern-inset) - 1px); /* The row border adds the last pixel. */
+}
+.aligned-floor-strip {
+  grid-column: 1; grid-row: 6; min-width: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
+  column-gap: 4px; margin-top: 7px; padding-inline: var(--pattern-inset);
+}
+.aligned-floor-strip .board-heading { align-self: start; margin-top: 2px; font-size: .73rem; overflow-wrap: anywhere; }
+.game-table .aligned-floor-strip .floor {
+  grid-column: auto; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  inline-size: calc(5 * var(--tile-size) + 4 * var(--pattern-gap));
+  gap: 3px; margin: 0; justify-self: end;
+}
+.aligned-floor-strip .floor .ceramic { width: 100%; height: auto; aspect-ratio: 1; }
+.match-layout .own .board-grid > .aligned-floor-action {
+  grid-column: 2; grid-row: 6; justify-self: end;
+  align-self: start; margin-top: 7px; min-height: 44px;
+}
