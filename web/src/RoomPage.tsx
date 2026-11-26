@@ -86,7 +86,7 @@ function InviteLink({ url }: { url: string }) {
   );
 }
 
-function CopyRoomName({ name, url, className }: { name: string; url: string; className?: string }) {
+function CopyRoomName({ name, url }: { name: string; url: string }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const fallback = useRef<HTMLDialogElement>(null);
@@ -106,7 +106,7 @@ function CopyRoomName({ name, url, className }: { name: string; url: string; cla
   }
 
   return <>
-    <button type="button" className={`copy-room-name ${className ?? ""}`} onClick={copy}
+    <button type="button" className="copy-room-name" onClick={copy}
       title="Copy room link" aria-label={`Copy room link for ${name}`}>{name}</button>
     <span className="sr-only" role="status">{copied ? "Room link copied." : ""}</span>
     {createPortal(<>
@@ -369,11 +369,8 @@ export function RoomPage({ id }: { id: string }) {
     <main className={room?.game ? "room-page playing" : "room-page"}>
       <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
         <ThemeToggle />
-        {room?.game && <div className="room-header-game">
-          <CopyRoomName key={room.slug} className="room-header-name" name={title} url={roomLink} />
-          {closeRoomPath && <button type="button" className="secondary leave-game" disabled={!!pending}
-            onClick={() => { setActionError(""); setConfirmClose(true); }}>Leave game</button>}
-        </div>}
+        {closeRoomPath && <button type="button" className="secondary leave-game" disabled={!!pending}
+          onClick={() => { setActionError(""); setConfirmClose(true); }}>Leave game</button>}
       </header>
       {confirmClose && closeRoomPath && <CloseRoomDialog busy={pending?.name === "close"} error={readError || actionError}
         onConfirm={() => void act({ name: "close", roomPath: closeRoomPath })} onCancel={() => { setConfirmClose(false); setActionError(""); }} />}
