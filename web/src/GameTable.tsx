@@ -89,7 +89,7 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
         <h2 title={name}>{name} {own && <small>You</small>}</h2>
       </div>
       <p className="points"><strong>{player.score}</strong><span className="sr-only"> points</span>{anticipatedScore !== undefined && <>{" "}
-        <span className="score-preview" title="Current score plus bonuses already earned on the wall" aria-hidden="true">({anticipatedScore})</span>
+        <strong className="score-preview" title="Current score plus bonuses already earned on the wall" aria-hidden="true">({anticipatedScore})</strong>
         <span className="sr-only">, {anticipatedScore} points including current wall bonuses</span>
       </>}<span aria-hidden="true"> pts</span></p>
     </header>
