@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { APIError, botPersonalities, inviteURL, postJSON, requestJSON, roomName, roomPath, seatName, type BotLevel, type Move, type Room } from "./api";
 import { GuestPanel } from "./GuestPanel";
 import { rememberGame } from "./recentGame";
@@ -83,6 +84,38 @@ function InviteLink({ url }: { url: string }) {
       </div>
     </div>
   );
+}
+
+function CopyRoomName({ name, url, className }: { name: string; url: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  const fallback = useRef<HTMLDialogElement>(null);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      setCopied(false);
+      if (fallback.current && !fallback.current.open) fallback.current.showModal();
+      return;
+    }
+    setCopied(true);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setCopied(false), 2000);
+  }
+
+  return <>
+    <button type="button" className={`copy-room-name ${className ?? ""}`} onClick={copy}
+      title="Copy room link" aria-label={`Copy room link for ${name}`}>{copied ? "Copied!" : name}</button>
+    <span className="sr-only" role="status">{copied ? "Room link copied." : ""}</span>
+    {createPortal(<dialog className="close-room-dialog copy-room-dialog" ref={fallback} aria-label="Copy room link manually">
+      <label className="field-label">Copy this room link
+        <input readOnly value={url} autoFocus onFocus={event => event.currentTarget.select()} />
+      </label>
+      <button type="button" className="secondary" onClick={() => fallback.current?.close()}>Done</button>
+    </dialog>, document.body)}
+  </>;
 }
 
 function AddPlayer({ pending, onAdd }: { pending: RoomAction | null; onAdd: () => void }) {
@@ -320,6 +353,7 @@ export function RoomPage({ id }: { id: string }) {
   const bot = room?.seats.find(seat => seat.isBot);
   const closeRoomPath = host && bot && room?.game ? `/api/rooms/${encodeURIComponent(room.id)}` : null;
   const finishedBotGame = host && bot && room?.game?.finished ? room.game : null;
+  const roomLink = room ? inviteURL(room.slug) : "";
   const title = missing ? "Room not found" : room ? roomName(room.slug) : "Room for two";
   let status = "";
   if (host && !full) status = room?.listed ? "Waiting for a second player." : "Invite a friend or add a bot to the open seat.";
@@ -333,7 +367,7 @@ export function RoomPage({ id }: { id: string }) {
       <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
         <ThemeToggle />
         {room?.game && <div className="room-header-game">
-          <span className="room-header-name" title={title}>{title}</span>
+          <CopyRoomName key={room.slug} className="room-header-name" name={title} url={roomLink} />
           {closeRoomPath && <button type="button" className="secondary leave-game" disabled={!!pending}
             onClick={() => { setActionError(""); setConfirmClose(true); }}>Leave game</button>}
         </div>}
@@ -352,8 +386,8 @@ export function RoomPage({ id }: { id: string }) {
           <PlayGuide />
           <details className="room-settings" name="game-tools"><summary>{bot ? "Room settings" : "Room and invite"}</summary>
             <div className="game-tool-panel">
-              <p className="settings-room-name">{title}</p>
-              {!bot && <InviteLink url={inviteURL(room.slug)} />}
+              <p className="settings-room-name"><CopyRoomName key={room.slug} name={title} url={roomLink} /></p>
+              {!bot && <InviteLink url={roomLink} />}
               <GuestPanel onSaved={refresh} />
             </div>
           </details>
@@ -361,13 +395,13 @@ export function RoomPage({ id }: { id: string }) {
         </div>
       </> : <div className="room-layout">
         <div className="room-content">
-          <h1>{title}</h1>
+          <h1>{room ? <CopyRoomName key={room.slug} name={title} url={roomLink} /> : title}</h1>
           {missing && <p className="intro">Check the invitation link or <a href="/">create a new room</a>.</p>}
           {!missing && !room && !readError && <p role="status">Opening room…</p>}
           {room && <>
             {status && <p className="intro" role="status">{status}</p>}
             {seated ? <>
-              {!bot && <InviteLink url={inviteURL(room.slug)} />}
+              {!bot && <InviteLink url={roomLink} />}
               {host && !full && <div className="listing-control">
                 <label><input type="checkbox" checked={pending?.name === "listing" ? pending.body.listed : room.listed} disabled={!!pending}
                   onChange={event => void act({ name: "listing", body: { listed: event.target.checked } })} />List in public lobby</label>

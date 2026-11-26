@@ -151,7 +151,10 @@ a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .room-page { max-width: 1088px; width: calc(100% - clamp(64px, 12vw, 160px)); margin: 0 auto; padding: 36px 0 64px; }
 .room-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 20px; border-bottom: 1px solid var(--border); padding: 0 0 20px; }
 .room-header a { display: inline-flex; align-items: center; gap: .22em; min-height: 44px; color: var(--text-heading); text-decoration: none; font: 1.45rem Georgia, serif; }
-.room-header-name { overflow-wrap: anywhere; color: var(--text-muted); font-size: .92rem; }
+button.copy-room-name { background: transparent; color: inherit; padding: 0; border: 0; min-width: 0; max-width: 100%; font: inherit; letter-spacing: inherit; text-align: left; }
+button.copy-room-name:hover { background: transparent; text-decoration: underline; text-underline-offset: .16em; }
+button.room-header-name { overflow-wrap: anywhere; color: var(--text-muted); font-size: .92rem; }
+.copy-room-dialog input { margin-top: 8px; }
 .room-header .theme-toggle { margin-left: auto; }
 .room-header-game { display: flex; align-items: center; gap: 12px; }
 .room-header img { margin-right: 9px; }
