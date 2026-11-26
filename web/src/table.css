@@ -56,6 +56,9 @@
 .pattern-row:enabled:hover { background: var(--selected-hover); }
 .tile-group:disabled:hover, .pattern-row:disabled:hover { background: none; }
 .row-note { margin-right: auto; min-width: .8em; font-size: .73rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pattern-row:has(.row-overflow) { flex-wrap: wrap; }
+.pattern-tiles { display: flex; gap: inherit; }
+.row-overflow { margin-inline-end: auto; max-width: 100%; font-size: .875rem; font-weight: 650; line-height: 1.2; text-align: start; }
 .ceramic.preview { background: color-mix(in srgb, var(--glaze) 42%, var(--surface)); color: var(--text); border: 1px dashed var(--border-selected); box-shadow: none; }
 .wall-row { display: flex; gap: 2px; align-items: center; }
 .wall-row > span { display: flex; }

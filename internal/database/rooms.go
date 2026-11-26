@@ -47,7 +47,7 @@ func seatLabel(number int, name string, level game.BotLevel) Seat {
 }
 
 // NewHash identifies a candidate session. The caller issues its cookie only
-// when CreateRoom or JoinRoom reports that the transaction created a session.
+// when the room transaction reports that it created a session.
 type RoomSession struct {
 	ExistingHash []byte
 	NewHash      []byte
@@ -197,6 +197,17 @@ func lockHostRoom(ctx context.Context, tx pgx.Tx, key string, sessionHash []byte
 }
 
 func seatAndCommit(ctx context.Context, tx pgx.Tx, room Room, session RoomSession) (Room, bool, error) {
+	room, newSession, err := seatPlayer(ctx, tx, room, session)
+	if err != nil {
+		return Room{}, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Room{}, false, err
+	}
+	return room, newSession, nil
+}
+
+func seatPlayer(ctx context.Context, tx pgx.Tx, room Room, session RoomSession) (Room, bool, error) {
 	var player Player
 	if len(session.ExistingHash) > 0 {
 		var err error
@@ -215,9 +226,6 @@ func seatAndCommit(ctx context.Context, tx pgx.Tx, room Room, session RoomSessio
 	}
 	room.YourSeat = len(room.Seats) + 1
 	if _, err := tx.Exec(ctx, "INSERT INTO room_seats (room_id, number, player_id) VALUES ($1, $2, $3)", room.ID, room.YourSeat, player.ID); err != nil {
-		return Room{}, false, err
-	}
-	if err := tx.Commit(ctx); err != nil {
 		return Room{}, false, err
 	}
 	room.Seats = append(room.Seats, seatLabel(room.YourSeat, player.DisplayName, ""))

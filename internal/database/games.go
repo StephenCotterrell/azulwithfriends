@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/StephenCotterrell/azulwithfriends/internal/game"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -19,6 +20,7 @@ var (
 	ErrIllegalMove        = errors.New("That move is unavailable. Check whose turn it is and choose a legal move.")
 	ErrRematchUnavailable = errors.New("A rematch is available after finishing a game against a bot.")
 	ErrStaleRematch       = errors.New("The game has changed. Use the latest results to start a rematch.")
+	ErrSoloStartConflict  = errors.New("This start request couldn’t be resumed. Select Play the computer to try again.")
 )
 
 type gameAction uint8
@@ -28,6 +30,44 @@ const (
 	draft
 	rematch
 )
+
+// CreateSoloGame commits the guest, both seats and a playable board together.
+func CreateSoloGame(ctx context.Context, pool *pgxpool.Pool, id string, session RoomSession) (Room, bool, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return Room{}, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	room := Room{ID: id}
+	err = tx.QueryRow(ctx, "INSERT INTO rooms (id) VALUES ($1) ON CONFLICT (id) DO NOTHING RETURNING slug", id).Scan(&room.Slug)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// A retry can recover the board only with the original host's cookie.
+		room, err := GetRoom(ctx, tx, id, session.ExistingHash)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return Room{}, false, err
+		}
+		if room.YourSeat != 1 || room.Game == nil || len(room.Seats) != roomCapacity || !room.Seats[1].IsBot {
+			return Room{}, false, ErrSoloStartConflict
+		}
+		return room, false, nil
+	}
+	if err != nil {
+		return Room{}, false, err
+	}
+	room, newSession, err := seatPlayer(ctx, tx, room, session)
+	if err != nil {
+		return Room{}, false, err
+	}
+	if err := insertBotSeat(ctx, tx, id, game.BotNoob); err != nil {
+		return Room{}, false, err
+	}
+	room.Seats = append(room.Seats, seatLabel(2, "", game.BotNoob))
+	state := game.New()
+	snapshot := roomSnapshot{room: room, state: &state}
+	started, err := commitGame(ctx, tx, snapshot, true)
+	return started, newSession, err
+}
 
 // StartGame is safe for the host to repeat, including after the last round.
 func StartGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash []byte) (Room, error) {
@@ -106,6 +146,10 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 		state := game.New()
 		snapshot.state = &state
 	}
+	return commitGame(ctx, tx, snapshot, isBotGame)
+}
+
+func commitGame(ctx context.Context, tx pgx.Tx, snapshot roomSnapshot, isBotGame bool) (Room, error) {
 	// Revisions are scoped to the room, so a draft from an earlier game stays stale.
 	snapshot.revision++
 	// The first player is random, and the first-player marker can give the
