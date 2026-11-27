@@ -4,6 +4,7 @@ import "./table.css";
 import { TableIcon } from "./TableActions";
 import "./match-controls.css";
 
+const placementPrompt = "Choose a pattern line or the floor";
 const floorCosts = [1, 1, 2, 2, 2, 3, 3];
 const sourceName = (source: number) => source === 0 ? "Center" : `Factory ${source}`;
 
@@ -36,18 +37,28 @@ function Ceramic({ color, ghost = false, preview = false, pending = false }: { c
   </span>;
 }
 
-type Pick = { source: number; color: Color; count: number; revision: number };
+type Pick = { source: number; color: Color; count: number; revision: number; keyboard: boolean };
 
-function focusControl(control: HTMLButtonElement | null, region: string) {
+function focusControl(control: HTMLElement | null | undefined, keyboard: boolean) {
   if (!control) return;
   control.focus({ preventScroll: true });
-  control.closest(region)?.scrollIntoView({ block: "nearest" });
-  // On a short landscape screen the whole region may not fit.
-  control.scrollIntoView({ block: "nearest" });
+  if (keyboard) control.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function PickSummary({ count, color, source, markerNote }: {
+  count: number; color: Color; source: number; markerNote: string;
+}) {
+  return <div className="picked-info">
+    <span className="picked-glaze"><Ceramic color={color} /></span>
+    <span>
+      <strong>{count} {color} {count === 1 ? "tile" : "tiles"} <b aria-hidden="true">·</b> {sourceName(source)}</strong>
+      {markerNote && <small>{markerNote}</small>}
+    </span>
+  </div>;
 }
 
 function Supply({ game, active, selected, onPick, showHint, markerNote, onChange }: {
-  showHint: boolean; markerNote: string; onChange: () => void;
+  showHint: boolean; markerNote: string; onChange: (keyboard: boolean) => void;
   game: Game; active: boolean; selected: Pick | null; onPick: (pick: Pick, button: HTMLButtonElement) => void;
 }) {
   function draftButton(source: number, color: Color, tiles: Color[], index: number) {
@@ -57,24 +68,28 @@ function Supply({ game, active, selected, onPick, showHint, markerNote, onChange
     return <button key={source === 0 ? color : index} type="button" className="tile-group" data-source={source} data-color={color}
       aria-label={`Take ${count} ${color} from ${sourceName(source)}`} tabIndex={duplicate ? -1 : undefined}
       aria-pressed={selected?.source === source && selected.color === color}
-      disabled={!active} onClick={event => onPick({ source, color, count, revision: game.revision }, event.currentTarget)}>
+      disabled={!active} onClick={event => onPick({ source, color, count, revision: game.revision, keyboard: event.detail === 0 }, event.currentTarget)}>
       <Ceramic color={color} />
       {source === 0 && count > 1 && <span className="tile-quantity" aria-hidden="true">×{count}</span>}
     </button>;
   }
   return <section className="supply" aria-label="Drafting area">
-    {selected ? <div className="supply-summary">
-      <div className="picked-info">
-        <span className="picked-glaze"><Ceramic color={selected.color} /></span>
-        <span>
-          <strong>{selected.count} {selected.color} {selected.count === 1 ? "tile" : "tiles"} <b aria-hidden="true">·</b> {sourceName(selected.source)}</strong>
-          {markerNote && <small>{markerNote}</small>}
-        </span>
+    <div className={`supply-bar ${selected ? "supply-summary" : showHint ? "supply-hint" : "supply-title"}`}>
+      <div className="supply-copy">
+        {/* Size the shared track to the longest draft label at the player's text size. */}
+        <div className="draft-sizer" aria-hidden="true">
+          <PickSummary count={20} color="yellow" source={0} markerNote={firstPlayerNote(floorCosts.length)} />
+        </div>
+        {selected ? <PickSummary {...selected} markerNote={markerNote} /> :
+          <div className="supply-heading">{showHint ? <><TableIcon name="pick" />Pick a tile color</> : "Tile supply"}</div>}
       </div>
-      <button type="button" className="text-button change-draft" disabled={!active} onClick={onChange}>Change tiles</button>
-    </div> : showHint && <div className="supply-hint">
-      <span><TableIcon name="pick" />Pick a tile color</span><small>Factories or center</small>
-    </div>}
+      <div className="supply-action">
+        <small className={showHint && !selected ? undefined : "draft-sizer"}>Factories or center</small>
+        <button type="button" className={`text-button change-draft${selected ? "" : " draft-sizer"}`}
+          disabled={!active || !selected} aria-hidden={!selected || undefined}
+          onClick={event => onChange(event.detail === 0)}>Change tiles</button>
+      </div>
+    </div>
     <div className="factory-rack">{game.factories.map((tiles, index) =>
       <div className="plate" key={index} role="group" aria-label={`${sourceName(index + 1)}${tiles.length ? "" : ", empty"}`}>
         {tiles.map((color, slot) => draftButton(index + 1, color, tiles, slot))}
@@ -83,8 +98,10 @@ function Supply({ game, active, selected, onPick, showHint, markerNote, onChange
     <div className="table-center">
       <h3>Center</h3>
       <div className="center-groups">
-        {game.markerInCenter && <span className="first-marker" role="img" aria-label="First-player marker" title="The first center draft takes this marker"><Ceramic color="first" /></span>}
-        {colors.filter(color => game.center.includes(color)).map(color => draftButton(0, color, game.center, 0))}
+        <span className={`first-marker${game.markerInCenter ? "" : " draft-sizer"}`} aria-hidden={!game.markerInCenter || undefined}
+          role="img" aria-label="First-player marker" title="The first center draft takes this marker"><Ceramic color="first" /></span>
+        {colors.map(color => game.center.includes(color) ? draftButton(0, color, game.center, 0) :
+          <span key={color} className="tile-group draft-sizer" aria-hidden="true"><Ceramic color={color} /></span>)}
         {!game.center.length && !game.markerInCenter && <span className="empty-plate">Empty</span>}
       </div>
     </div>
@@ -98,6 +115,7 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
 }) {
   const allowed = (row: number) => own && !!selected && legalMoves.some(move =>
     move.source === selected.source && move.color === selected.color && move.row === row);
+  const savingSelection = !!selected && saving;
   const floorHeading = <h3 className="board-heading">Floor</h3>;
   const floor = <ol className="floor" aria-label="Floor penalties">{floorCosts.map((cost, index) => {
       const preview = previewMarker && index === player.floor.length;
@@ -105,7 +123,7 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
       const label = tile === "first" ? "first-player marker" : tile ?? "empty";
       return <li key={index}>
         <span className="sr-only">Floor space {index + 1}, {preview && "preview of "}{label}, minus {cost}</span>
-        <Ceramic color={tile} preview={preview} /><span aria-hidden="true">−{cost}</span>
+        <Ceramic color={tile} preview={preview} /><span className="floor-cost" aria-hidden="true">−<wbr />{cost}</span>
       </li>;
     })}</ol>;
   return <section className={`player-board${own ? " own" : ""}${compact ? " compact" : ""}`} aria-label={`${name}, seat ${seat}${compact ? ", opponent board" : ""}`}>
@@ -118,8 +136,15 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
         <span className="sr-only">, {anticipatedScore} points including current wall bonuses</span>
       </>}<span aria-hidden="true"> pts</span></p>
     </header>
-    {own && selected && (saving ? <p className="board-progress"><span className="saving-mark" aria-hidden="true" />Saving your move…</p> :
-      instruction ? <div className="board-hint"><TableIcon name="place" />{instruction}</div> : null)}
+    {alignedFloor && <div className="board-caption">
+      <span className="board-prompt draft-sizer" aria-hidden="true"><TableIcon name="place" />{placementPrompt}</span>
+      <p className={`board-message ${savingSelection ? "board-progress" : "draft-sizer"}`} aria-hidden={!savingSelection}>
+        <span className="saving-mark" aria-hidden="true" />Saving your move…
+      </p>
+      {!savingSelection && (selected && instruction
+        ? <div className="board-prompt board-hint"><TableIcon name="place" />{instruction}</div>
+        : <div className="board-columns"><span>Pattern lines</span><span>Wall</span></div>)}
+    </div>}
     <div className={`board-grid${alignedFloor ? " aligned-floor-grid" : ""}`}>
       {player.lines.map((line, index) => {
         const row = index + 1;
@@ -141,7 +166,12 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
           {own ? <button type="button" className="pattern-row" data-row={row} data-legal={enabled ? "yes" : undefined} disabled={!enabled || busy}
             aria-label={enabled ? `Place on pattern line ${row}, ${line.count} of ${row} filled${floorLabel ? `, ${floorLabel}` : ""}` : description + (blocked ? `, unavailable, ${blocked}` : "")}
             aria-describedby={enabled ? "draft-selection" : undefined} onClick={event => onPlace(row, event.detail)}>
-            <span className="line-label" aria-hidden="true"><span className="line-number">{row}</span>{overflow > 0 && <span className="overflow-note">{overflow} to floor</span>}</span>
+            <span className="line-label" aria-hidden="true">
+              <span className="line-number">{row}</span>
+              {overflow > 0 && <span className="overflow-note" title={floorLabel}>
+                <span>{overflow}</span><span><span className="overflow-to"> to </span>floor</span>
+              </span>}
+            </span>
             <span className="pattern-tiles">{slots}</span>
           </button> : <div className="pattern-row" role="img" aria-label={description}><span className="row-note">{row}</span>{slots}</div>}
           <div className="wall-row" role="group" aria-label={`Wall row ${row}`}>
@@ -158,8 +188,9 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
       })}
       {alignedFloor && <>
         <div className="aligned-floor-strip">{floorHeading}{floor}</div>
-        {own && selected && <button type="button" className="floor-action aligned-floor-action" data-row={0} disabled={!allowed(0) || busy}
-          aria-describedby="draft-selection" onClick={event => onPlace(0, event.detail)}>Place on floor</button>}
+        <button type="button" className={`floor-action aligned-floor-action${selected ? "" : " draft-sizer"}`}
+          data-row={0} disabled={!allowed(0) || busy} aria-hidden={!selected || undefined}
+          aria-describedby={selected ? "draft-selection" : undefined} onClick={event => onPlace(0, event.detail)}>Place on floor</button>
       </>}
     </div>
     {!alignedFloor && <><div className="floor-caption">{floorHeading}</div>{floor}</>}
@@ -167,15 +198,23 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
   </section>;
 }
 
-function LastDraft({ move, actor }: { move: NonNullable<Game["lastMove"]>; actor: string }) {
-  const source = sourceName(move.source);
+function DraftRoute({ move, actor }: { move: Move & { count: number }; actor: string }) {
+  return <>
+    <span className="recap-actor"><b>Last</b><span className="recap-dot">·</span>{actor}</span>
+    <span className="recap-piece"><Ceramic color={move.color} /><b>{move.count} {move.color}</b></span>
+    <span className="recap-route"><span className="recap-dot">·</span>{sourceName(move.source)} <span className="route-arrow">→</span> {move.row ? `Line ${move.row}` : "Floor"}</span>
+  </>;
+}
+
+function LastDraft({ move, actor, opponent }: { move: Game["lastMove"]; actor: string; opponent?: string }) {
   return <p className="compact-recap" role="status" aria-atomic="true">
-    <span className="sr-only">Last draft. {actor} took {move.count} {move.color} {move.count === 1 ? "tile" : "tiles"} from {source} for {move.row ? `line ${move.row}` : "the floor"}.</span>
-    <span className="recap-visible" aria-hidden="true">
-      <span className="recap-actor"><b>Last</b><span className="recap-dot">·</span>{actor}</span>
-      <span className="recap-piece"><Ceramic color={move.color} /><b>{move.count} {move.color}</b></span>
-      <span className="recap-route"><span className="recap-dot">·</span>{source} <span className="route-arrow">→</span> {move.row ? `Line ${move.row}` : "Floor"}</span>
-    </span>
+    {opponent && <span className="recap-visible draft-sizer" aria-hidden="true">
+      <DraftRoute actor={opponent.length < 3 ? "You" : opponent} move={{ source: 5, color: "yellow", count: 20, row: 5 }} />
+    </span>}
+    {move ? <>
+      <span className="sr-only">Last draft. {actor} took {move.count} {move.color} {move.count === 1 ? "tile" : "tiles"} from {sourceName(move.source)} for {move.row ? `line ${move.row}` : "the floor"}.</span>
+      <span className="recap-visible" aria-hidden="true"><DraftRoute move={move} actor={actor} /></span>
+    </> : <span>Opening draft</span>}
   </p>;
 }
 
@@ -214,7 +253,7 @@ export function GameTable({ room, game, busy, savingMove, networkPaused, draftHi
   const heading = useRef<HTMLHeadingElement>(null);
   const opponent = useRef<HTMLElement>(null);
   const sourceButton = useRef<HTMLButtonElement | null>(null);
-  const submittedRevision = useRef<number | null>(null);
+  const submission = useRef<{ revision: number; keyboard: boolean } | null>(null);
   const wasFinished = useRef(game.finished);
   const name = (number: number) => {
     const seat = room.seats.find(player => player.number === number);
@@ -239,7 +278,7 @@ export function GameTable({ room, game, busy, savingMove, networkPaused, draftHi
 
   useLayoutEffect(() => {
     if (!selected || !table.current) return;
-    focusControl(table.current.querySelector<HTMLButtonElement>(".own button[data-row]:enabled"), ".player-board");
+    focusControl(table.current.querySelector<HTMLButtonElement>(".own button[data-row]:enabled"), selected.keyboard);
   }, [selected]);
 
   useLayoutEffect(() => {
@@ -258,41 +297,43 @@ export function GameTable({ room, game, busy, savingMove, networkPaused, draftHi
   }, [selected, locked]);
 
   useLayoutEffect(() => {
-    if (busy || submittedRevision.current === null || game.revision <= submittedRevision.current) return;
-    submittedRevision.current = null;
+    const submitted = submission.current;
+    if (busy || !submitted || game.revision <= submitted.revision) return;
+    submission.current = null;
     // Only hand off focus if the player is still at the placement controls.
     if (document.activeElement !== document.body && !document.activeElement?.matches("[data-row]")) return;
     const next = active ? table.current?.querySelector<HTMLButtonElement>(".supply button:enabled") :
       heading.current;
-    next?.focus();
+    focusControl(next, submitted.keyboard);
   }, [busy, game.revision, active]);
 
   function clearPick() {
     setPick(null);
-    submittedRevision.current = null;
+    submission.current = null;
   }
 
-  function changeTiles() {
+  function changeTiles(keyboard: boolean) {
     clearPick();
-    focusControl(sourceButton.current, ".supply");
+    focusControl(sourceButton.current, keyboard);
   }
 
   function place(row: number, clickCount: number) {
-    // A double tap on the supply can land on a row after the board scrolls.
+    // Ignore the second click of a double tap while handing off to a destination.
     if (!selected || locked || clickCount > 1) return;
-    submittedRevision.current = selected.revision;
+    submission.current = { revision: selected.revision, keyboard: clickCount === 0 };
     onMove({ source: selected.source, color: selected.color, row, revision: selected.revision });
   }
   const seatLabel = (seat: number) => room.seats.find(s => s.number === seat)?.displayName || name(seat);
   const status = yourTurn ? "Your turn" : `${seatLabel(game.turn)}’s turn`;
   const move = game.lastMove;
-  const lastDraft = move && <LastDraft move={move} actor={move.seat === room.yourSeat ? "You" : seatLabel(move.seat)} />;
+  const actor = move && move.seat !== room.yourSeat ? seatLabel(move.seat) : "You";
+  const lastDraft = <LastDraft move={move} actor={actor} opponent={game.finished ? undefined : seatLabel(3 - room.yourSeat)} />;
   const rows = selected ? game.legalMoves
     .filter(move => move.source === selected.source && move.color === selected.color && move.row > 0)
     .map(move => move.row) : [];
   const markerNote = takesMarker ? firstPlayerNote(game.players[room.yourSeat - 1].floor.length) : "";
   const instruction = draftHints && active
-    ? (rows.length ? "Choose a pattern line or the floor" : "Place these tiles on the floor")
+    ? (rows.length ? placementPrompt : "Place these tiles on the floor")
     : undefined;
   let selectionStatus = active && draftHints ? "Pick a tile color from one factory or the center." : "";
   if (selected) {
