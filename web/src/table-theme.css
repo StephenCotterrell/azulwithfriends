@@ -30,3 +30,14 @@
 .ceramic.black { --glaze: #36454a; --motif: #d8e2d7; }
 .ceramic.white { --glaze: #fff9e8; --motif: #427b7c; }
 .ceramic.first { --glaze: #70458d; --motif: #fff4dc; }
+
+/* The match header, controls and board share the same state colors. */
+.playing {
+  --cue-ink: light-dark(#1e4f53, #a2d8ce);
+  --cue-on-ink: light-dark(#fffdf4, #142c2d);
+  --cue-line: light-dark(#47716b, #8fc6b8);
+  --notice-border: light-dark(#ab8654, #9c7851);
+  --notice-surface: light-dark(#fbf2de, #443b30);
+  --notice-ink: light-dark(#815613, #e7bb76);
+  --menu-backdrop: light-dark(#18363942, #09151c86);
+}
