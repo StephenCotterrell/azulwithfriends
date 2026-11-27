@@ -2,11 +2,13 @@
 
 A two-player browser adaptation of Azul built with Go, React, TypeScript and PostgreSQL. Select **Play the computer** on the homepage to start a private game against the default Noob bot. To choose a different personality, create a room, choose **AI** in the open seat and select **Add bot**. Choose a **Personality** on the bot’s seat, then select **Start game**. You can change the personality or remove the bot until the game starts. To play with another person, share a **Link only** invitation or offer the open seat in the **Public lobby**. Opening an invitation automatically claims an open seat. Guests can also join directly from the lobby. You can play as a guest without signing in or choosing a display name. [Play Azul with Friends](https://azulwithfriends.com)
 
-The game uses the standard colored wall. The server randomly selects the first player. On your turn, select a color from one factory or the center, then choose a highlighted pattern line or the floor. The bot takes its turns automatically. **Last draft** shows what it picked. Both boards score automatically after each round. Completing a wall row triggers final scoring at the end of that round. [Publisher’s rulebook](https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf)
+The game uses the standard colored wall. The server randomly selects the first player. On your turn, select a color from one factory or the center, then choose a highlighted pattern line or the floor. The bot takes its turns automatically. Beneath the turn indicator, the last draft shows who moved, which tiles they took, and where they placed them. Both boards score automatically after each round. Completing a wall row triggers final scoring at the end of that round. [Publisher’s rulebook](https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf)
 
 After a bot match ends, choose **Rematch** on the final scores to start a fresh game in the same room with the same bot personality. The new game replaces the previous scores in that room.
 
-During a bot match or from its final scores, choose **Leave game**, then **Leave and close room**. This removes the saved game, closes the invitation, and returns you to the lobby.
+Open **More → Draft hints** to switch the pick and placement prompts on or off in this browser. Selected tiles, legal destinations, and overflow stay visible. If room updates are interrupted, **Retry now** reconnects immediately.
+
+During a bot match or from its final scores, open **More**, choose **Leave game…**, then confirm **Leave and close room**. This removes the saved game, closes the invitation, and returns you to the lobby.
 
 Your opponent’s live miniature board shows their pattern lines, wall, floor and score while you play. It stays beside the table on desktop and at the top of the screen as you scroll on mobile. Final scores show both full-size boards.
 

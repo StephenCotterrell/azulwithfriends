@@ -5,6 +5,7 @@ import { GuestPanel } from "./GuestPanel";
 import { rememberGame } from "./recentGame";
 import { GameTable, PlayGuide } from "./GameTable";
 import { ThemeToggle } from "./ThemeToggle";
+import { TableActions, TableIcon, useDraftHints } from "./TableActions";
 
 function canJoin(room: Room) {
   return room.yourSeat === 0 && room.seats.length === 1 && !room.game;
@@ -199,6 +200,25 @@ export function RoomPage({ id }: { id: string }) {
   const [retryJoin, setRetryJoin] = useState(false);
   const [pending, setPending] = useState<RoomAction | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [draftHints, setDraftHints] = useDraftHints();
+  const more = useRef<HTMLButtonElement>(null);
+  const [checkingMove, setCheckingMove] = useState(false);
+  const [manualRetry, setManualRetry] = useState(false);
+  const returnAfterRetry = useRef(false);
+  useEffect(() => {
+    if (readError || !returnAfterRetry.current) return;
+    returnAfterRetry.current = false;
+    if (document.activeElement !== document.body && !document.activeElement?.matches(".retry-now")) return;
+    const next = document.querySelector<HTMLElement>(".own button[data-row]:enabled")
+      ?? document.querySelector<HTMLElement>(".supply .tile-group:enabled")
+      ?? document.querySelector<HTMLElement>(".game-heading h1");
+    next?.focus({ preventScroll: true });
+  }, [readError]);
+  function closeMenu() {
+    setMenuOpen(false);
+    more.current?.focus({ preventScroll: true });
+  }
   const writing = useRef(false);
   const triedInvite = useRef(false);
   const currentRead = useRef<AbortController | null>(null);
@@ -260,6 +280,7 @@ export function RoomPage({ id }: { id: string }) {
             setActionError(confirmed ? "" : "The room is up to date. You can try again.");
           }
           uncertainWrite.current = null;
+          setCheckingMove(false);
         }
         // Claim once per visit, only after a visible page has checked the guest's seat.
         if (!embedded && canJoin(snapshot) && !triedInvite.current) {
@@ -289,6 +310,8 @@ export function RoomPage({ id }: { id: string }) {
           setReadError("Connection interrupted. Reconnecting to the room…");
           timer = window.setTimeout(read, 5000);
         }
+      } finally {
+        if (!request.signal.aborted) setManualRetry(false);
       }
     }
     function resume() {
@@ -312,6 +335,7 @@ export function RoomPage({ id }: { id: string }) {
 
   async function act(action: RoomAction) {
     if (writing.current) return;
+    if ((action.name === "moves" || action.name === "rematch") && (readError || uncertainWrite.current)) return;
     writing.current = true;
     currentRead.current?.abort();
     setPending(action);
@@ -338,6 +362,7 @@ export function RoomPage({ id }: { id: string }) {
       }
       if (!(cause instanceof APIError) || cause.status >= 500 || (action.name === "close" && cause.status === 404)) {
         uncertainWrite.current = action;
+        setCheckingMove(action.name === "moves" || action.name === "rematch");
         setActionError(action.name === "close" ? "Checking whether the room closed…" : "Checking the latest room state…");
       } else {
         setActionError(cause instanceof Error ? cause.message : "Couldn’t update this room. Try again.");
@@ -367,32 +392,36 @@ export function RoomPage({ id }: { id: string }) {
 
   return (
     <main className={room?.game ? "room-page playing" : "room-page"}>
-      <header className="room-header"><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
+      <header className="room-header" data-keep-draft><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
         <ThemeToggle />
-        {closeRoomPath && <button type="button" className="secondary leave-game" disabled={!!pending}
-          onClick={() => { setActionError(""); setConfirmClose(true); }}>Leave game</button>}
+        {room?.game && <button type="button" ref={more} id="table-more" className="secondary table-more" aria-haspopup="dialog"
+          aria-expanded={menuOpen} aria-controls={menuOpen ? "table-actions" : undefined}
+          onClick={() => setMenuOpen(true)}><TableIcon name="more" />More</button>}
       </header>
+      {menuOpen && room?.game && <TableActions trigger={more} busy={!!pending || checkingMove} hints={draftHints} onHints={setDraftHints} onDone={closeMenu}
+        help={<PlayGuide />} settings={<div className="match-settings">
+          <p className="settings-room-title"><CopyRoomName key={room.slug} name={title} url={roomLink} /></p>
+          {!bot && <InviteLink url={roomLink} />}
+          <GuestPanel onSaved={refresh} />
+        </div>} onLeave={closeRoomPath ? () => { setMenuOpen(false); setActionError(""); setConfirmClose(true); } : undefined} />}
       {confirmClose && closeRoomPath && <CloseRoomDialog busy={pending?.name === "close"} error={readError || actionError}
-        onConfirm={() => void act({ name: "close", roomPath: closeRoomPath })} onCancel={() => { setConfirmClose(false); setActionError(""); }} />}
+        onConfirm={() => void act({ name: "close", roomPath: closeRoomPath })} onCancel={() => { setConfirmClose(false); setActionError(""); setMenuOpen(true); }} />}
       {actionError && !confirmClose && <p className="game-error" role="alert">{actionError}</p>}
-      {readError && !confirmClose && !missing && <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>}
+      {readError && !confirmClose && !missing && (room?.game ? <aside data-keep-draft className="update-notice">
+        <TableIcon name="interruption" /><div role="alert"><strong>Updates interrupted</strong><p>Moves paused. Retrying automatically.</p></div>
+        <button type="button" className="secondary retry-now" disabled={manualRetry} onClick={() => {
+          returnAfterRetry.current = true;
+          setManualRetry(true);
+          refresh();
+        }}>{manualRetry ? "Retrying…" : "Retry now"}</button>
+      </aside> : <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>)}
       {room?.game ? <>
-        <GameTable room={room} game={room.game} busy={!!pending} onMove={move => void act({ name: "moves", body: move })}
+        <GameTable room={room} game={room.game} busy={!!pending} savingMove={pending?.name === "moves"} networkPaused={!!readError || checkingMove}
+          draftHints={draftHints} onMove={move => void act({ name: "moves", body: move })}
           rematch={finishedBotGame ? {
             pending: pending?.name === "rematch",
             onStart: () => void act({ name: "rematch", body: { revision: finishedBotGame.revision } }),
           } : undefined} />
-        <div className="game-tools">
-          <PlayGuide />
-          <details className="room-settings" name="game-tools"><summary>{bot ? "Room settings" : "Room and invite"}</summary>
-            <div className="game-tool-panel">
-              <p className="settings-room-name"><CopyRoomName key={room.slug} name={title} url={roomLink} /></p>
-              {!bot && <InviteLink url={roomLink} />}
-              <GuestPanel onSaved={refresh} />
-            </div>
-          </details>
-          <button type="button" className="text-button" onClick={refresh}>Refresh table</button>
-        </div>
       </> : <div className="room-layout">
         <div className="room-content">
           <h1>{room ? <CopyRoomName key={room.slug} name={title} url={roomLink} /> : title}</h1>

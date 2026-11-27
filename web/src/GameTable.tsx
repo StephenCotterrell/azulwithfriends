@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { colors, seatName, type Board, type Color, type Game, type Move, type Room, type RoundScore, type Tile } from "./api";
 import "./table.css";
+import { TableIcon } from "./TableActions";
+import "./match-controls.css";
 
 const floorCosts = [1, 1, 2, 2, 2, 3, 3];
 const sourceName = (source: number) => source === 0 ? "Center" : `Factory ${source}`;
@@ -44,7 +46,8 @@ function focusControl(control: HTMLButtonElement | null, region: string) {
   control.scrollIntoView({ block: "nearest" });
 }
 
-function Supply({ game, active, selected, onPick }: {
+function Supply({ game, active, selected, onPick, showHint, markerNote, onChange }: {
+  showHint: boolean; markerNote: string; onChange: () => void;
   game: Game; active: boolean; selected: Pick | null; onPick: (pick: Pick, button: HTMLButtonElement) => void;
 }) {
   function draftButton(source: number, color: Color, tiles: Color[], index: number) {
@@ -60,6 +63,18 @@ function Supply({ game, active, selected, onPick }: {
     </button>;
   }
   return <section className="supply" aria-label="Drafting area">
+    {selected ? <div className="supply-summary">
+      <div className="picked-info">
+        <span className="picked-glaze"><Ceramic color={selected.color} /></span>
+        <span>
+          <strong>{selected.count} {selected.color} {selected.count === 1 ? "tile" : "tiles"} <b aria-hidden="true">·</b> {sourceName(selected.source)}</strong>
+          {markerNote && <small>{markerNote}</small>}
+        </span>
+      </div>
+      <button type="button" className="text-button change-draft" disabled={!active} onClick={onChange}>Change tiles</button>
+    </div> : showHint && <div className="supply-hint">
+      <span><TableIcon name="pick" />Pick a tile color</span><small>Factories or center</small>
+    </div>}
     <div className="factory-rack">{game.factories.map((tiles, index) =>
       <div className="plate" key={index} role="group" aria-label={`${sourceName(index + 1)}${tiles.length ? "" : ", empty"}`}>
         {tiles.map((color, slot) => draftButton(index + 1, color, tiles, slot))}
@@ -76,10 +91,10 @@ function Supply({ game, active, selected, onPick }: {
   </section>;
 }
 
-function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, onChangeTiles, previous, round, compact = false, alignedFloor = false }: {
+function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, previewMarker, busy, legalMoves, onPlace, instruction, saving, previous, round, compact = false, alignedFloor = false }: {
   player: Board; anticipatedScore?: number; seat: number; own: boolean; name: string; selected: Pick | null; legalMoves: Move[];
   previewMarker: boolean; busy: boolean;
-  onPlace: (row: number, clickCount: number) => void; onChangeTiles: () => void; previous?: RoundScore; round?: number; compact?: boolean; alignedFloor?: boolean;
+  onPlace: (row: number, clickCount: number) => void; instruction?: string; saving: boolean; previous?: RoundScore; round?: number; compact?: boolean; alignedFloor?: boolean;
 }) {
   const allowed = (row: number) => own && !!selected && legalMoves.some(move =>
     move.source === selected.source && move.color === selected.color && move.row === row);
@@ -103,14 +118,8 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
         <span className="sr-only">, {anticipatedScore} points including current wall bonuses</span>
       </>}<span aria-hidden="true"> pts</span></p>
     </header>
-    {selected && <div className="placement-summary">
-      <div id="draft-selection">
-        <span className="draft-source"><strong>{selected.count} {selected.color} {selected.count === 1 ? "tile" : "tiles"}</strong> · {sourceName(selected.source)}</span>
-        <div role="status">{busy ? "Saving your move…" : <>Choose a line or the floor.<span className="cancel-hint"> Click elsewhere to cancel.</span></>}</div>
-        {previewMarker && <span className="marker-note">{firstPlayerNote(player.floor.length)}</span>}
-      </div>
-      <button type="button" className="text-button change-tiles" disabled={busy} onClick={onChangeTiles}>Change tiles</button>
-    </div>}
+    {own && selected && (saving ? <p className="board-progress"><span className="saving-mark" aria-hidden="true" />Saving your move…</p> :
+      instruction ? <div className="board-hint"><TableIcon name="place" />{instruction}</div> : null)}
     <div className={`board-grid${alignedFloor ? " aligned-floor-grid" : ""}`}>
       {player.lines.map((line, index) => {
         const row = index + 1;
@@ -119,6 +128,8 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
         const overflow = enabled ? Math.max(0, selected!.count - capacity) : 0;
         const floorLabel = overflow ? `${overflow} ${overflow === 1 ? "tile" : "tiles"} to floor` : "";
         const projected = enabled ? Math.min(capacity, selected!.count) : 0;
+        const blocked = !selected || enabled ? "" : line.count >= row ? "line full" :
+          line.count && line.color !== selected.color ? `line already holds ${line.color}` : `${selected.color} already on this wall row`;
         const description = `Pattern line ${row}, ${line.count} of ${row}${line.color ? " " + line.color : ""}`;
         const slots = Array.from({ length: row }, (_, col) => {
           const filled = col >= capacity;
@@ -127,10 +138,10 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
         });
         const wall = player.wall[index];
         return <div key={row} className="board-row">
-          {own ? <button type="button" className="pattern-row" data-row={row} disabled={!enabled || busy}
-            aria-label={enabled ? `Place on pattern line ${row}, ${line.count} of ${row} filled${floorLabel ? `, ${floorLabel}` : ""}` : description}
+          {own ? <button type="button" className="pattern-row" data-row={row} data-legal={enabled ? "yes" : undefined} disabled={!enabled || busy}
+            aria-label={enabled ? `Place on pattern line ${row}, ${line.count} of ${row} filled${floorLabel ? `, ${floorLabel}` : ""}` : description + (blocked ? `, unavailable, ${blocked}` : "")}
             aria-describedby={enabled ? "draft-selection" : undefined} onClick={event => onPlace(row, event.detail)}>
-            <span className={floorLabel ? "row-overflow" : "row-note"}>{floorLabel || row}</span>
+            <span className="line-label" aria-hidden="true"><span className="line-number">{row}</span>{overflow > 0 && <span className="overflow-note">{overflow} to floor</span>}</span>
             <span className="pattern-tiles">{slots}</span>
           </button> : <div className="pattern-row" role="img" aria-label={description}><span className="row-note">{row}</span>{slots}</div>}
           <div className="wall-row" role="group" aria-label={`Wall row ${row}`}>
@@ -154,6 +165,18 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
     {!alignedFloor && <><div className="floor-caption">{floorHeading}</div>{floor}</>}
     {previous && !compact && <p className="round-score">Round {round} <span>+{previous.wall} wall</span><span>−{previous.penalty} floor</span></p>}
   </section>;
+}
+
+function LastDraft({ move, actor }: { move: NonNullable<Game["lastMove"]>; actor: string }) {
+  const source = sourceName(move.source);
+  return <p className="compact-recap" role="status" aria-atomic="true">
+    <span className="sr-only">Last draft. {actor} took {move.count} {move.color} {move.count === 1 ? "tile" : "tiles"} from {source} for {move.row ? `line ${move.row}` : "the floor"}.</span>
+    <span className="recap-visible" aria-hidden="true">
+      <span className="recap-actor"><b>Last</b><span className="recap-dot">·</span>{actor}</span>
+      <span className="recap-piece"><Ceramic color={move.color} /><b>{move.count} {move.color}</b></span>
+      <span className="recap-route"><span className="recap-dot">·</span>{source} <span className="route-arrow">→</span> {move.row ? `Line ${move.row}` : "Floor"}</span>
+    </span>
+  </p>;
 }
 
 type Rematch = { pending: boolean; onStart: () => void };
@@ -183,8 +206,8 @@ function Results({ game, name, yourSeat, busy, rematch }: {
   </section>;
 }
 
-export function GameTable({ room, game, busy, onMove, rematch }: {
-  room: Room; game: Game; busy: boolean; onMove: (move: Move & { revision: number }) => void; rematch?: Rematch;
+export function GameTable({ room, game, busy, savingMove, networkPaused, draftHints, onMove, rematch }: {
+  room: Room; game: Game; busy: boolean; savingMove: boolean; networkPaused: boolean; draftHints: boolean; onMove: (move: Move & { revision: number }) => void; rematch?: Rematch;
 }) {
   const [pick, setPick] = useState<Pick | null>(null);
   const table = useRef<HTMLDivElement>(null);
@@ -198,7 +221,8 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
     return seat ? seatName(seat) : `Player ${number}`;
   };
   const yourTurn = !game.finished && game.turn === room.yourSeat;
-  const active = yourTurn && !busy;
+  const locked = busy || networkPaused;
+  const active = yourTurn && !locked;
   const selected = yourTurn && pick?.revision === game.revision ? pick : null;
   const takesMarker = selected?.source === 0 && game.markerInCenter;
 
@@ -224,14 +248,14 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
   }, [game.finished]);
 
   useEffect(() => {
-    if (!selected || busy) return;
+    if (!selected || locked) return;
     function handleClickAway(event: MouseEvent) {
-      if (event.target instanceof Element && table.current?.contains(event.target.closest("button"))) return;
+      if (event.target instanceof Element && (event.target.closest("[data-keep-draft], dialog") || table.current?.contains(event.target.closest("button")))) return;
       clearPick();
     }
     document.addEventListener("click", handleClickAway, true);
     return () => document.removeEventListener("click", handleClickAway, true);
-  }, [selected, busy]);
+  }, [selected, locked]);
 
   useLayoutEffect(() => {
     if (busy || submittedRevision.current === null || game.revision <= submittedRevision.current) return;
@@ -255,23 +279,38 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
 
   function place(row: number, clickCount: number) {
     // A double tap on the supply can land on a row after the board scrolls.
-    if (!selected || busy || clickCount > 1) return;
+    if (!selected || locked || clickCount > 1) return;
     submittedRevision.current = selected.revision;
     onMove({ source: selected.source, color: selected.color, row, revision: selected.revision });
   }
-  const status = game.turn === room.yourSeat ? "Your turn" : `${name(game.turn)}’s turn`;
-  const lastMove = game.lastMove;
-  const lastDrafter = room.seats.find(seat => seat.number === lastMove?.seat);
-  const lastDraft = lastMove && <p className="last-draft" role="status">
-    <strong>Last draft</strong> {lastDrafter?.displayName ?? name(lastMove.seat)} took {lastMove.count} {lastMove.color}{" "}
-    from {lastMove.source === 0 ? "the center" : sourceName(lastMove.source)} for {lastMove.row ? `line ${lastMove.row}` : "the floor"}.
-  </p>;
+  const seatLabel = (seat: number) => room.seats.find(s => s.number === seat)?.displayName || name(seat);
+  const status = yourTurn ? "Your turn" : `${seatLabel(game.turn)}’s turn`;
+  const move = game.lastMove;
+  const lastDraft = move && <LastDraft move={move} actor={move.seat === room.yourSeat ? "You" : seatLabel(move.seat)} />;
+  const rows = selected ? game.legalMoves
+    .filter(move => move.source === selected.source && move.color === selected.color && move.row > 0)
+    .map(move => move.row) : [];
+  const markerNote = takesMarker ? firstPlayerNote(game.players[room.yourSeat - 1].floor.length) : "";
+  const instruction = draftHints && active
+    ? (rows.length ? "Choose a pattern line or the floor" : "Place these tiles on the floor")
+    : undefined;
+  let selectionStatus = active && draftHints ? "Pick a tile color from one factory or the center." : "";
+  if (selected) {
+    const available = rows.length
+      ? `Pattern ${rows.length === 1 ? "line" : "lines"} ${rows.join(", ")} and the floor are available.`
+      : "Only the floor is available.";
+    const next = savingMove ? "Saving your move." : networkPaused ? "Moves paused." : available;
+    selectionStatus = [
+      `${selected.count} ${selected.color} ${selected.count === 1 ? "tile" : "tiles"} from ${sourceName(selected.source)}.`,
+      markerNote, instruction && instruction + ".", next,
+    ].filter(Boolean).join(" ");
+  }
   const renderBoard = (seat: number, compact = false) =>
     <PlayerBoard key={seat} seat={seat} name={name(seat)} own={seat === room.yourSeat} player={game.players[seat - 1]}
       anticipatedScore={game.finished ? undefined : game.anticipatedScores?.[seat - 1]} alignedFloor={!game.finished && seat === room.yourSeat}
       selected={seat === room.yourSeat ? selected : null} previewMarker={seat === room.yourSeat && takesMarker} legalMoves={game.legalMoves}
-      busy={busy} onPlace={place} onChangeTiles={changeTiles} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} compact={compact} />;
-  return <div ref={table} className="game-table" data-game-revision={game.revision} data-turn={game.turn}
+      busy={locked} saving={savingMove} instruction={instruction} onPlace={place} previous={game.lastRound?.players[seat - 1]} round={game.lastRound?.round} compact={compact} />;
+  return <div ref={table} className="game-table" data-game-revision={game.revision} data-turn={game.turn} data-hints={draftHints ? "on" : "off"}
     onKeyDown={event => {
       // Holding Enter to pick must not also activate the newly focused destination.
       if (event.key === "Enter" && event.repeat) event.preventDefault();
@@ -280,19 +319,18 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
     <div className="game-heading"><h1 ref={heading} tabIndex={-1}>{game.finished ? "Final scores" : `Round ${game.round}`}</h1>
       {!game.finished && <p className="turn" role="status"><i className={game.turn === room.yourSeat ? "active" : ""} /><span title={status}>{status}</span></p>}
     </div>
+    {!game.finished && lastDraft}
+    <span id="draft-selection" className="sr-only" role="status" aria-live="polite" aria-atomic="true">{selectionStatus}</span>
     <div className={game.finished ? "finished-table" : "match-layout"}>
       {!game.finished && <aside ref={opponent} className="opponent-overview" aria-label="Opponent overview">
-        {lastDraft}
         {renderBoard(3 - room.yourSeat, true)}
       </aside>}
       <div className="match-main">
-        {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} busy={busy} rematch={rematch} /> : <>
-          <Supply game={game} active={active} selected={selected} onPick={(nextPick, button) => {
+        {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} busy={locked} rematch={rematch} /> :
+          <Supply game={game} active={active} selected={selected} showHint={active && draftHints} markerNote={markerNote} onChange={changeTiles} onPick={(nextPick, button) => {
             sourceButton.current = button;
             setPick(nextPick);
-          }} />
-          <div className="draft-help" role="status">{active && !selected ? "Choose a tile color." : null}</div>
-        </>}
+          }} />}
         {game.finished && lastDraft}
         <div className="boards">{(game.finished ? [room.yourSeat, 3 - room.yourSeat] : [room.yourSeat]).map(seat => renderBoard(seat))}</div>
       </div>
@@ -301,8 +339,7 @@ export function GameTable({ room, game, busy, onMove, rematch }: {
 }
 
 export function PlayGuide() {
-  return <details className="play-guide" name="game-tools"><summary>How to play</summary>
-    <div className="game-tool-panel">
+  return <div className="play-guide">
       <ol>
         <li>Take every tile of one color from a factory or the center. A factory’s other tiles move to the center. The first center draft also puts the start marker on your floor and gives you first turn next round.</li>
         <li>Choose one pattern line or the floor. A line holds one color and its wall row must still have room for that color. Extra tiles go to the floor.</li>
@@ -311,6 +348,5 @@ export function PlayGuide() {
         <li>The score in brackets includes end-game bonuses from tiles already on your wall, but not pending placements or floor penalties.</li>
       </ol>
       <a href="https://cdn.svc.asmodee.net/production-nextmove/uploads/sites/4/2024/06/EN-Azul-Rules-Next-Move-web.pdf" target="_blank" rel="noreferrer">Publisher’s rulebook</a>
-    </div>
-  </details>;
+  </div>;
 }

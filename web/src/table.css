@@ -2,7 +2,6 @@
 
 .room-page.playing { max-width: 1192px; width: calc(100% - clamp(32px, 8vw, 120px)); padding-top: 20px; }
 .playing .room-header { padding-bottom: 12px; }
-.leave-game { font-size: .9rem; padding: 8px 14px; }
 .close-room-dialog { width: min(410px, calc(100% - 32px)); border: 1px solid var(--border); border-radius: 9px; padding: 24px; background: var(--surface); color: var(--text); }
 .close-room-dialog::backdrop { background: var(--backdrop); }
 .close-room-dialog h2 { margin: 0; font: 400 1.85rem/1.15 Georgia, serif; color: var(--text-heading); }
@@ -33,9 +32,6 @@
 .tile-group:disabled, .pattern-row:disabled { opacity: 1; cursor: default; }
 .tile-quantity { position: absolute; right: -3px; bottom: -1px; border-radius: 8px; box-shadow: 0 0 0 1px var(--border); min-width: 18px; text-align: center; color: var(--text); background: var(--surface); padding: 1px 3px; font: 750 .67rem/1.15 system-ui,sans-serif; }
 .first-marker { margin: 0 3px; display: grid; place-items: center; }
-.draft-help { padding: 12px 0 6px; color: var(--text); font-size: .95rem; line-height: 1.45; }
-.last-draft { margin: 0; overflow-wrap: anywhere; color: var(--text-muted); font-size: .83rem; }
-.last-draft strong { margin-right: 5px; }
 .boards { margin: 13px 0 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: clamp(12px,2vw,30px); align-items: start; }
 .player-board { --tile-size: clamp(19px,2.65vw,36px); border: 1px solid var(--border); border-top-width: 4px; border-radius: 8px; background: var(--surface); padding: 15px clamp(10px,1.8vw,22px) 12px; min-width: 0; }
 .player-board.own { border-top-color: var(--border-selected); }
@@ -43,9 +39,6 @@
 .board-player { min-width: 0; }
 .board-header h2, .results h2 { margin: 0; font: normal clamp(22px,2.2vw,32px)/1.2 Georgia, serif; color: var(--text-heading); letter-spacing: -.04em; overflow-wrap: anywhere; }
 .board-header small { font: 600 .72rem system-ui,sans-serif; letter-spacing: 0; margin-left: 1px; color: var(--text-accent); }
-.placement-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; padding: 2px 0 6px; border-bottom: 1px solid var(--border-subtle); color: var(--text); font-size: .9rem; line-height: 1.4; }
-.marker-note { display: block; margin-top: 2px; font-size: .82rem; }
-.placement-summary .change-tiles { flex: none; min-height: 44px; padding: 5px 4px; }
 .points { white-space: nowrap; margin: 0; color: var(--text-muted); font-size: .85rem; }
 .points strong { font: 500 clamp(22px,2.2vw,32px) Georgia,serif; color: var(--text-heading); }
 .board-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: clamp(5px,1vw,17px); row-gap: 1px; }
@@ -56,9 +49,7 @@
 .pattern-row:enabled:hover { background: var(--selected-hover); }
 .tile-group:disabled:hover, .pattern-row:disabled:hover { background: none; }
 .row-note { margin-right: auto; min-width: .8em; font-size: .73rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.pattern-row:has(.row-overflow) { flex-wrap: wrap; }
 .pattern-tiles { display: flex; gap: inherit; }
-.row-overflow { margin-inline-end: auto; max-width: 100%; font-size: .875rem; font-weight: 650; line-height: 1.2; text-align: start; }
 .ceramic.preview { background: color-mix(in srgb, var(--glaze) 42%, var(--surface)); color: var(--text); border: 1px dashed var(--border-selected); box-shadow: none; }
 .wall-row { display: flex; gap: 2px; align-items: center; }
 .wall-row > span { display: flex; }
@@ -79,22 +70,16 @@
 .results tbody th { font-weight: 400; }
 .results tr:last-child td,.results tr:last-child th { font-weight: 650; border-bottom: 0; }
 .results .actions { gap: 8px 16px; margin-top: 12px; }
-.game-tools { margin-top: 20px; border-top: 1px solid var(--border); }
-.game-tools details { border-bottom: 1px solid var(--border-subtle); padding: 9px 0; }
-.game-tools summary { cursor: pointer; padding: 5px 0; font-weight: 600; color: var(--text-accent); }
-.game-tools summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .play-guide ol { max-width: 760px; margin: 6px 0; padding-left: 21px; line-height: 1.55; }
 .play-guide li + li { margin-top: 6px; }
 .play-guide a { display: inline-block; padding: 4px 0; }
 .room-settings .invite { padding: 10px 0 0; }
-.settings-room-name { display: none; }
 .game-error { color: var(--error); padding: 8px 12px; background: var(--error-surface); border-radius: 5px; margin: 10px 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .match-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
 .match-main { min-width: 0; }
 .match-layout .boards { grid-template-columns: 1fr; }
 .opponent-overview { grid-column: 2; grid-row: 1; position: sticky; top: 12px; z-index: 2; }
-.opponent-overview .last-draft { margin-bottom: 6px; }
 .match-layout .match-main { grid-column: 1; grid-row: 1; }
 .player-board.compact { --tile-size: 19px; padding: 12px; box-shadow: 0 3px 12px var(--table-shadow); }
 .opponent-label { display: block; margin-bottom: 2px; color: var(--text-muted); font-size: .67rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
@@ -139,7 +124,6 @@
   .playing .room-header { flex-wrap: nowrap; gap: 6px; padding-bottom: 0; }
   .playing .room-header a { flex: none; font-size: 1.05rem; }
   .playing .room-header img { width: 24px; height: 24px; margin-right: 2px; }
-  .playing .leave-game { flex: none; padding-inline: 7px; font-size: .75rem; }
   .game-heading { flex-wrap: nowrap; gap: 10px; padding: 4px 0; }
   .game-heading h1 { flex: none; font-size: 1.75rem; }
   .turn { min-width: 0; gap: 6px; font-size: .8rem; }
@@ -147,13 +131,11 @@
   .turn span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .match-layout { gap: 6px; }
   .opponent-overview { padding-top: 3px; }
-  .opponent-overview .last-draft { margin-bottom: 3px; font-size: .75rem; line-height: 1.25; }
   .player-board.compact { padding-block: 4px 5px; }
   .compact .board-header { padding-bottom: 2px; margin-bottom: 2px; }
   .compact .board-grid { row-gap: 0; }
   .compact .pattern-row { min-height: calc(var(--tile-size) + 2px); }
   .compact .row-note { line-height: 1; }
-  .draft-help { display: none; }
   .boards { margin-top: 6px; }
   .boards .player-board {
     --tile-size: clamp(18px, 6vw, 28px);
@@ -163,7 +145,7 @@
     gap: 3px 6px;
     padding: 4px 8px;
   }
-  .boards :is(.board-header, .placement-summary, .board-grid, .round-score) { grid-column: 1 / -1; }
+  .boards :is(.board-header, .board-grid, .round-score) { grid-column: 1 / -1; }
   .boards .board-header { padding-bottom: 2px; margin-bottom: 0; }
   .boards .board-header h2, .boards .points strong { font-size: 1.25rem; }
   .boards .board-header h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -173,39 +155,6 @@
   .boards .floor { justify-self: start; margin: 0; }
   .boards .floor li { gap: 0; line-height: 1.15; }
   .round-score { margin: 0; padding-top: 2px; font-size: .72rem; line-height: 1.3; }
-  .placement-summary { margin: 0; padding: 0; font-size: .78rem; line-height: 1.25; }
-  .marker-note { margin-top: 0; font-size: .72rem; }
-  .placement-summary .change-tiles { font-size: .75rem; }
-  .cancel-hint { display: none; }
-}
-@media (max-width: 640px), (max-width: 1024px) and (orientation: portrait), (max-width: 960px) and (max-height: 540px) and (orientation: landscape) {
-  .game-tools {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 4px;
-    font-size: .78rem;
-  }
-  .game-tools details { padding: 0; border: 0; }
-  .game-tools summary { min-height: 44px; padding: 0 3px; line-height: 44px; white-space: nowrap; }
-  .game-tools > .text-button { padding-inline: 3px; font-size: inherit; white-space: nowrap; }
-  .game-tool-panel {
-    position: absolute;
-    z-index: 3;
-    inset: auto 0 100%;
-    max-height: 65svh;
-    overflow: auto;
-    overscroll-behavior: contain;
-    padding: 10px 14px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    background: var(--surface);
-    box-shadow: 0 3px 12px var(--table-shadow, var(--backdrop));
-    font-size: .9rem;
-  }
-  .settings-room-name { display: block; margin: 0 0 4px; font-weight: 650; }
 }
 @media (max-width: 640px), (max-width: 960px) and (max-height: 540px) and (orientation: landscape) {
   .results { padding: 6px 8px; margin-bottom: 4px; }
@@ -217,7 +166,7 @@
   .results th span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .results .actions { gap: 4px 8px; margin-top: 4px; font-size: .78rem; }
   .results .actions button { min-height: 36px; padding: 4px 8px; }
-  .finished-table .last-draft { font-size: .75rem; line-height: 1.25; }
+  .finished-table .compact-recap { font-size: .75rem; line-height: 1.25; }
 
   .match-layout .factory-rack { display: contents; }
   .match-layout .plate { width: min(100%, var(--factory-size)); gap: 0; }
@@ -347,40 +296,12 @@
   .match-layout .boards { margin-top: 8px; }
   .match-layout .own .board-header { padding-bottom: 4px; }
   .match-layout .own .board-grid { row-gap: 2px; }
-  .match-layout .own:has(.placement-summary) .board-grid { row-gap: clamp(0px, 4svh - 28px, 2px); }
-  /* Keep the selection beside the player's score so all five destination rows stay in reach. */
-  .match-layout .own:has(.placement-summary) .board-header {
-    grid-column: 1;
-    grid-row: 1;
-    flex-direction: column;
-    align-items: start;
-    gap: 0;
-    width: 6rem;
-    padding: 0;
-    border: 0;
-  }
   .match-layout .own .board-player { max-width: 100%; }
-  .match-layout .placement-summary {
-    grid-column: 2;
-    grid-row: 1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0 4px;
-    font-size: .75rem;
-    line-height: 1.2;
-  }
-  .match-layout #draft-selection { display: contents; }
-  .match-layout .draft-source { grid-column: 1; grid-row: 1; }
-  .match-layout .change-tiles { grid-column: 2; grid-row: 1; min-height: 26px; padding: 2px; }
-  .match-layout #draft-selection > :is([role="status"], .marker-note) { grid-column: 1 / -1; }
-  .game-tools summary { min-height: var(--table-control-height); line-height: var(--table-control-height); }
-  .game-tools > .text-button { min-height: var(--table-control-height); }
 }
 /* Short portrait screens can share one row between the opponent and the supply. */
 @media (max-width: 640px) and (height < 700px) and (orientation: portrait) {
   .match-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
   .match-layout .match-main, .opponent-overview { display: contents; }
-  .opponent-overview .last-draft { grid-column: 1 / -1; grid-row: 1; margin: 0; font-size: .7rem; }
   .player-board.compact {
     --tile-size: clamp(10px, 3.2vw, 15px);
     grid-column: 1;
@@ -417,8 +338,6 @@
   .playing .room-header .theme-toggle { width: 36px; height: 36px; }
   .game-heading { padding: 2px 0; }
   .game-heading h1 { font-size: 1.5rem; }
-  .game-tools summary { min-height: 36px; line-height: 36px; }
-  .game-tools > .text-button { min-height: 36px; }
 }
 @media (max-width: 640px), (max-width: 960px) and (max-height: 540px) and (orientation: landscape) {
   .finished-table .boards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -465,7 +384,7 @@
     gap: 4px 8px;
   }
   .finished-table .results { grid-column: 1; grid-row: 1 / span 2; margin: 0; }
-  .finished-table .last-draft { grid-column: 2; grid-row: 1; }
+  .finished-table .compact-recap { grid-column: 2; grid-row: 1; }
   .finished-table .boards { grid-column: 2; grid-row: 2; margin: 0; }
   .finished-table .player-board { --tile-size: clamp(10px, 1.85vw, 17px); }
 }
@@ -474,16 +393,12 @@
   .playing .game-table { display: contents; }
   .playing .room-header { grid-column: 1; grid-row: 1; padding-right: 8px; }
   .playing .game-heading { grid-column: 2; grid-row: 1; border-bottom: 1px solid var(--border); }
-  .playing :is(.match-layout, .finished-table, .game-tools, .game-error, .read-error) { grid-column: 1 / -1; }
+  .playing :is(.match-layout, .finished-table, .compact-recap, .update-notice, .game-error, .read-error) { grid-column: 1 / -1; }
   .playing .match-layout, .playing .finished-table { margin-top: 4px; }
   .match-layout .boards .own { --tile-size: clamp(17px, 3vw, 22px); gap: 1px 5px; padding-block: 2px; }
   .match-layout .own .board-header h2, .match-layout .own .points strong { font-size: 1rem; }
-  .match-layout .own .placement-summary { font-size: .7rem; line-height: 1.1; }
-  .match-layout .own .change-tiles { min-height: 30px; }
-  .match-layout .own .marker-note { font-size: .68rem; }
   .match-layout .own .floor-action { min-height: 30px; }
   .match-layout .own .round-score { padding-top: 1px; font-size: .68rem; line-height: 1.1; }
-  .opponent-overview .last-draft { font-size: .7rem; }
   .player-board.compact { --tile-size: 11px; column-gap: 6px; padding: 3px 6px; }
   .compact .board-header h2, .compact .points strong { font-size: .9rem; }
   .compact .board-grid { column-gap: 4px; }
@@ -497,12 +412,7 @@
   .match-layout { gap: 3px; }
   .match-layout .supply { --factory-size: 52px; }
   .match-layout .own .board-header h2, .match-layout .own .points strong { font-size: 1rem; }
-  .match-layout .own .placement-summary { font-size: .73rem; line-height: 1.15; }
-  .match-layout .own .change-tiles { min-height: 30px; }
-  .match-layout .own .marker-note { font-size: .68rem; }
   .match-layout .own .floor-action { min-height: 30px; }
-  .game-tools summary { min-height: 32px; line-height: 32px; }
-  .game-tools > .text-button { min-height: 32px; }
 }
 @media (min-width: 540px) and (max-width: 960px) and (max-height: 355px) and (orientation: landscape) {
   .room-page.playing { padding-block: 2px 0; }
@@ -513,23 +423,17 @@
   .results th:first-child { width: 45%; }
   .results .actions { gap: 4px; font-size: .72rem; }
   .results .actions button { min-height: 32px; padding-inline: 6px; }
-  .game-tools { margin-top: 2px; }
-  .game-tools summary { min-height: 32px; line-height: 32px; }
-  .game-tools > .text-button { min-height: 32px; }
 }
 
 /* On a portrait tablet, share the upper row so the playable wall can use the full width. */
 @media (min-width: 641px) and (max-width: 1024px) and (orientation: portrait) {
   .room-page.playing { width: calc(100% - 28px); padding: 5px 0; }
   .playing .room-header { flex-wrap: nowrap; gap: 12px; padding-bottom: 4px; }
-  .playing .leave-game { flex: none; }
   .game-heading { padding: 8px 0; }
   .game-heading h1 { font-size: clamp(30px, 4vw, 42px); }
   .match-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .opponent-overview, .match-layout .match-main { display: contents; }
-  .opponent-overview .last-draft { grid-column: 1 / -1; margin: 0; }
   .match-layout .boards { grid-column: 1 / -1; margin: 0; }
-  .match-layout .draft-help { display: none; }
   .match-layout :is(.supply, .own, .supply button, .own button) { scroll-margin-top: 0; }
 
   .match-layout .supply {
@@ -563,11 +467,8 @@
     align-self: stretch;
     align-content: space-between;
   }
-  .game-table :is(.board-header, .board-grid, .placement-summary, .round-score) { grid-column: 1 / -1; margin: 0; }
+  .game-table :is(.board-header, .board-grid, .round-score) { grid-column: 1 / -1; margin: 0; }
   .game-table .board-header { padding-bottom: 4px; }
-  .match-layout .placement-summary { padding: 0; }
-  #draft-selection > div, #draft-selection .marker-note { display: inline; margin-left: .5em; }
-  .cancel-hint { display: none; }
   .compact .board-player { display: block; }
   .compact .board-header h2 { font-size: 1.2rem; }
   .game-table .board-grid { grid-row: auto; width: 100%; max-width: none; column-gap: 8px; }
@@ -592,7 +493,6 @@
   .finished-table .boards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .finished-table .player-board { --tile-size: clamp(21px, 3.6vw, 37px); padding: 10px; }
   .finished-table .board-grid { column-gap: 4px; }
-  .game-tools { margin-top: 6px; font-size: .9rem; }
 }
 
 
