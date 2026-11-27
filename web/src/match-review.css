@@ -1,13 +1,32 @@
 .history-recap {
   grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center; column-gap: 6px; margin-bottom: 4px;
+  align-items: start; column-gap: 6px; margin-bottom: 4px;
 }
 .playing .history-recap .compact-recap { grid-column: 1; margin: 0; min-width: 0; }
 .history-entry.text-button {
-  display: inline-flex; gap: 5px; align-items: center; min-height: 44px;
-  padding: 3px 6px; font-size: .82rem; font-weight: 700;
+  /* The button borrows height from the noninteractive round heading above.
+     Its label stays on the first recap line and its hit box ends on that line. */
+  --hit-extra: max(0px, calc(44px - 1.32em));
+  display: inline-flex; gap: 5px; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px; border: 0;
+  margin-block-start: calc(-1 * var(--hit-extra)); padding: var(--hit-extra) 6px 0;
+  font-size: .81rem; line-height: 1.32; font-weight: 700;
 }
 .history-entry .table-icon, .open-replay .table-icon { width: 17px; height: 17px; }
+@media (max-width: 640px) {
+  .history-entry.text-button { padding-inline: 0; }
+  .history-entry .table-icon { display: none; }
+}
+@media (max-width: 24rem) {
+  /* Keep the player, tile count and destination together on small phones. */
+  .history-recap { column-gap: 4px; }
+  .history-recap .recap-actor > b, .history-recap .recap-actor > .recap-dot { display: none; }
+}
+@media (max-width: 350px) {
+  .history-entry.text-button { font-size: .77rem; }
+  .history-recap .recap-visible { column-gap: 4px; }
+  .history-recap .recap-route { gap: 2px; }
+}
 .results .open-replay { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; width: 100%; margin: 8px 0 14px; }
 .match-review {
   position: fixed; box-sizing: border-box; width: min(100%, 34rem); max-width: 100%;
