@@ -6,7 +6,7 @@
 }
 /* Inset the painted button while keeping its full hit area and menu anchor. */
 .table-more::before {
-  content: ""; position: absolute; inset: 4px 0; z-index: -1; pointer-events: none;
+  content: ""; position: absolute; inset: 6px 0; z-index: -1; pointer-events: none;
   background: var(--surface); border: 1px solid var(--border-control); border-radius: 7px;
 }
 .playing .room-header a { min-width: 0; flex: 0 1 auto; flex-wrap: wrap; }
