@@ -132,7 +132,7 @@
 /* Give the five-tile line a readable gutter without moving its tiles or the wall. */
 .match-layout .own { container-type: inline-size; --board-piece-size: var(--tile-size); }
 .aligned-floor-grid {
-  --tile-size: min(var(--board-piece-size), (100cqi - 2.65rem - 28px) / 10);
+  --tile-size: min(var(--board-piece-size), (100cqi - 3rem - 28px) / 10);
   grid-template-columns: minmax(0, 1fr) calc(5 * var(--tile-size) + 4 * var(--pattern-gap));
 }
 .aligned-floor-strip .floor-cost { max-inline-size: 100%; text-align: center; }
@@ -146,12 +146,13 @@
   display: flex; min-width: 0; align-items: center; gap: 3px;
 }
 .aligned-floor-grid .line-label { container-type: inline-size; }
-.line-number { min-width: .8em; text-align: center; font-size: .75rem; font-weight: 650; color: var(--text); }
+.line-number { flex: none; min-width: .8em; text-align: center; font-size: .75rem; font-weight: 650; color: var(--text); }
 .overflow-note {
-  display: inline-block; border: 1px solid var(--border-control); border-radius: 4px; padding: 2px 4px;
-  color: var(--text); background: var(--surface); white-space: nowrap; font-size: .73rem;
+  display: inline-block; min-width: 0; border: 1px solid var(--border-control); border-radius: 4px; padding: 2px 4px;
+  color: var(--text); background: var(--surface); white-space: normal; text-align: center; font-size: .73rem;
   font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums;
 }
+.overflow-note > span { white-space: nowrap; }
 @container (max-width: 5.25rem) {
   .line-label .overflow-note { display: inline-grid; justify-items: center; padding: 1px 2px; }
   .overflow-to { display: none; }

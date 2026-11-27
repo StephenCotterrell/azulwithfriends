@@ -169,7 +169,7 @@ function PlayerBoard({ player, anticipatedScore, seat, own, name, selected, prev
             <span className="line-label" aria-hidden="true">
               <span className="line-number">{row}</span>
               {overflow > 0 && <span className="overflow-note" title={floorLabel}>
-                <span>{overflow}</span><span><span className="overflow-to"> to </span>floor</span>
+                <span>{overflow}</span>{" "}<span><span className="overflow-to">to </span>floor</span>
               </span>}
             </span>
             <span className="pattern-tiles">{slots}</span>
