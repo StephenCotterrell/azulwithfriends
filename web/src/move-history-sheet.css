@@ -76,7 +76,7 @@
 .history-draft-entry:hover { background: var(--hover); }
 .move-history-sheet button:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
 .history-draft-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
-.history-draft-route { color: var(--text-muted); font-size: .875rem; }
+.history-draft-route { color: var(--text-muted); font-size: .8125rem; line-height: 1.4; }
 .history-draft-copy small, .history-draft-link { color: var(--text-muted); font-size: .77rem; }
 .history-draft-link { display: inline-flex; align-items: center; gap: .25rem; font-weight: 650; font-variant-numeric: tabular-nums; }
 .history-draft-link small { display: block; font-size: .7rem; font-weight: 500; }
