@@ -85,8 +85,7 @@ export type Board = {
   bonus: { rows: number; columns: number; colors: number };
 };
 export type RoundScore = { wall: number; penalty: number };
-export type Game = {
-  revision: number;
+export type HistoricalTable = {
   round: number;
   turn: number;
   finished: boolean;
@@ -94,9 +93,26 @@ export type Game = {
   center: Color[];
   markerInCenter: boolean;
   players: Board[];
-  anticipatedScores: [number, number];
   winners: number[];
-  legalMoves: Move[];
   lastMove?: (Move & { seat: number; count: number }) | null;
-  lastRound: { round: number; players: RoundScore[] } | null;
+  lastRound?: { round: number; players: RoundScore[] } | null;
+};
+
+export type Game = HistoricalTable & {
+  matchId?: string;
+  revision: number;
+  anticipatedScores: [number, number];
+  legalMoves: Move[];
+};
+
+export type HistoryEvent = {
+  kind: "opening" | "baseline" | "draft" | "scoring" | "refill" | "final";
+  table: HistoricalTable;
+};
+
+export type MatchHistory = {
+  matchId: string;
+  revision: number;
+  complete: boolean;
+  events: HistoryEvent[];
 };

@@ -74,7 +74,7 @@ func TestWallOrderAndFloorPenalties(t *testing.T) {
 	p.Lines[2] = Line{"red", 1}
 	p.Floor = []string{"black", firstMarker, "blue"}
 	// Row 1 scores two horizontally. Row 2 then scores two vertically.
-	s.finishRound()
+	s.finishRound(nil)
 	if s.LastRound.Players[0] != (RoundPoints{Wall: 4, Penalty: 4}) || p.Score != 10 || !p.Wall[0][0] || !p.Wall[1][0] {
 		t.Fatalf("wrong round result: %+v, board %+v", s.LastRound, p)
 	}
@@ -317,7 +317,7 @@ func TestAnticipatedScores(t *testing.T) {
 	if err := json.Unmarshal([]byte(encoded(t, view)), &decoded); err != nil || decoded.AnticipatedScores != view.AnticipatedScores {
 		t.Fatalf("invalid JSON preview: %+v, %v", decoded.AnticipatedScores, err)
 	}
-	s.finishRound()
+	s.finishRound(nil)
 	finished := s.View()
 	want := [2]int{s.Players[0].Score, s.Players[1].Score}
 	if !s.Finished || finished.AnticipatedScores != want {

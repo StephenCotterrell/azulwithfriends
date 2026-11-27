@@ -32,6 +32,7 @@ export function useDraftHints() {
 }
 
 const paths = {
+  history: "M3 11a9 9 0 1 1 2.7 7.5M3 4v7h7M12 7v5l3 2",
   pick: "M3 8V3h5m8 0h5v5m0 8v5h-5M8 21H3v-5",
   place: "M4 5v8h15m-6-6 6 6-6 6",
   help: "M4 4h4c2 0 4 1 4 3 0-2 2-3 4-3h4v14h-4c-2 0-4 1-4 3 0-2-2-3-4-3H4zM12 7v14",
