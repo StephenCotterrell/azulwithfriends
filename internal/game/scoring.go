@@ -6,7 +6,7 @@ func (b Bonus) total() int {
 
 var floorCosts = [...]int{1, 1, 2, 2, 2, 3, 3}
 
-func (s *State) finishRound() {
+func (s *State) finishRound(events *[]HistoryEvent) {
 	result := RoundResult{Round: s.Round}
 	var bonuses [2]Bonus
 	for i := range s.Players {
@@ -15,8 +15,11 @@ func (s *State) finishRound() {
 		bonuses[i] = p.wallBonus()
 	}
 	s.LastRound = &result
+	s.Turn = 0 // Neither player drafts while walls and floors are scored.
+	s.record(events, "scoring")
 	if bonuses[0].Rows == 0 && bonuses[1].Rows == 0 {
 		s.startRound()
+		s.record(events, "refill")
 		return
 	}
 	for i, bonus := range bonuses {
@@ -24,10 +27,10 @@ func (s *State) finishRound() {
 		p.Bonus = bonus
 		p.Score += bonus.total()
 	}
-	s.Turn = 0
 	s.Finished = true
 	s.MarkerInCenter = false
 	s.Winners = winners(s.Players)
+	s.record(events, "final")
 }
 
 func (s *State) tileWall(p *Player) RoundPoints {

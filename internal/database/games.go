@@ -65,7 +65,7 @@ func CreateSoloGame(ctx context.Context, pool *pgxpool.Pool, id string, session 
 	room.Seats = append(room.Seats, seatLabel(2, "", game.BotNoob))
 	state := game.New()
 	snapshot := roomSnapshot{room: room, state: &state}
-	started, err := commitGame(ctx, tx, snapshot, true)
+	started, err := commitGame(ctx, tx, snapshot, true, historyWrite{})
 	return started, newSession, err
 }
 
@@ -108,6 +108,7 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 		return Room{}, ErrStartRequiresHost
 	}
 	isBotGame := len(snapshot.room.Seats) == roomCapacity && snapshot.room.Seats[1].IsBot
+	var history historyWrite
 	switch action {
 	case start:
 		if snapshot.state != nil {
@@ -130,6 +131,9 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 		if revision != snapshot.revision {
 			return Room{}, ErrStaleRematch
 		}
+		if _, err := tx.Exec(ctx, "DELETE FROM room_history WHERE room_id = $1", snapshot.room.ID); err != nil {
+			return Room{}, err
+		}
 		snapshot.rematchFromRevision = revision
 	case draft:
 		if snapshot.state == nil {
@@ -138,7 +142,10 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 		if revision != snapshot.revision {
 			return Room{}, ErrStaleMove
 		}
-		if err := snapshot.state.Apply(snapshot.room.YourSeat, move); err != nil {
+		before := snapshot.state.PublicTable()
+		history.before = &before
+		history.events, err = snapshot.state.ApplyRecorded(snapshot.room.YourSeat, move)
+		if err != nil {
 			return Room{}, ErrIllegalMove
 		}
 	}
@@ -146,10 +153,14 @@ func changeGame(ctx context.Context, pool *pgxpool.Pool, id string, sessionHash 
 		state := game.New()
 		snapshot.state = &state
 	}
-	return commitGame(ctx, tx, snapshot, isBotGame)
+	return commitGame(ctx, tx, snapshot, isBotGame, history)
 }
 
-func commitGame(ctx context.Context, tx pgx.Tx, snapshot roomSnapshot, isBotGame bool) (Room, error) {
+func commitGame(ctx context.Context, tx pgx.Tx, snapshot roomSnapshot, isBotGame bool, history historyWrite) (Room, error) {
+	previousRevision := snapshot.revision
+	if history.before == nil {
+		history.events = []game.HistoryEvent{{Kind: "opening", Table: snapshot.state.PublicTable()}}
+	}
 	// Revisions are scoped to the room, so a draft from an earlier game stays stale.
 	snapshot.revision++
 	// The first player is random, and the first-player marker can give the
@@ -160,9 +171,11 @@ func commitGame(ctx context.Context, tx pgx.Tx, snapshot roomSnapshot, isBotGame
 		if !ok {
 			return Room{}, errors.New("bot has no move on its turn")
 		}
-		if err := snapshot.state.Apply(2, botMove); err != nil {
+		events, err := snapshot.state.ApplyRecorded(2, botMove)
+		if err != nil {
 			return Room{}, fmt.Errorf("apply bot move: %w", err)
 		}
+		history.events = append(history.events, events...)
 		snapshot.revision++
 	}
 	encoded, err := json.Marshal(snapshot.state)
@@ -172,6 +185,9 @@ func commitGame(ctx context.Context, tx pgx.Tx, snapshot roomSnapshot, isBotGame
 	if _, err := tx.Exec(ctx, `
 		UPDATE rooms SET game_state = $2::jsonb, game_revision = $3, rematch_from_revision = $4
 		WHERE id = $1`, snapshot.room.ID, string(encoded), snapshot.revision, snapshot.rematchFromRevision); err != nil {
+		return Room{}, err
+	}
+	if err := history.save(ctx, tx, snapshot, previousRevision); err != nil {
 		return Room{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {

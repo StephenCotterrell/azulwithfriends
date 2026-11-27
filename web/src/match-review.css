@@ -1,0 +1,29 @@
+.history-recap {
+  grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; column-gap: 6px; margin-bottom: 4px;
+}
+.playing .history-recap .compact-recap { grid-column: 1; margin: 0; min-width: 0; }
+.history-entry.text-button {
+  display: inline-flex; gap: 5px; align-items: center; min-height: 44px;
+  padding: 3px 6px; font-size: .82rem; font-weight: 700;
+}
+.history-entry .table-icon, .open-replay .table-icon { width: 17px; height: 17px; }
+.results .open-replay { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; width: 100%; margin: 8px 0 14px; }
+.match-review {
+  position: fixed; box-sizing: border-box; width: min(100%, 34rem); max-width: 100%;
+  max-height: 94dvh; padding: 0; border: 1px solid var(--border); border-radius: 16px;
+  color: var(--text); background: var(--surface); overflow: auto; overscroll-behavior: contain;
+}
+.match-review::backdrop { background: var(--backdrop); }
+.match-review.review-sheet { margin: auto auto 0; border-radius: 16px 16px 0 0; }
+.match-review.review-board { margin: auto; height: min(860px, 94dvh); }
+.match-review.review-board[open] { display: flex; flex-direction: column; overflow: hidden; }
+.review-list-pane[hidden] { display: none; }
+.review-list-pane { display: flex; flex-direction: column; min-height: 0; }
+.history-status, .review-notice { padding: 8px 14px; margin: 0; }
+.history-status p { margin: 0 0 6px; }
+.review-notice { color: var(--text); background: var(--surface-muted); font-size: .85rem; }
+.review-dismiss { margin: 8px 14px; }
+@media (max-width: 600px) {
+  .match-review.review-board { inset: 0; width: 100%; max-height: 100dvh; height: 100dvh; border: none; border-radius: 0; }
+}

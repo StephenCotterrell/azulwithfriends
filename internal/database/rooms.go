@@ -26,7 +26,8 @@ type Room struct {
 }
 
 type RoomGame struct {
-	Revision int `json:"revision"`
+	Revision int    `json:"revision"`
+	MatchID  string `json:"matchId"`
 	game.View
 }
 
@@ -76,9 +77,15 @@ type roomSnapshot struct {
 
 func (s roomSnapshot) publicRoom() Room {
 	if s.state != nil {
-		s.room.Game = &RoomGame{Revision: s.revision, View: s.state.View()}
+		s.room.Game = &RoomGame{Revision: s.revision, MatchID: s.matchID(), View: s.state.View()}
 	}
 	return s.room
+}
+
+func (s roomSnapshot) matchID() string {
+	// The first revision of each match is unique within its room, including
+	// matches already in progress when recording was introduced.
+	return s.room.ID + ":" + strconv.Itoa(s.rematchFromRevision+1)
 }
 
 // Both lookups use a unique index. Legacy UUIDs have four hyphens, whereas

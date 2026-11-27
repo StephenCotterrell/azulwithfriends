@@ -1,5 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { colors, seatName, type Board, type Color, type Game, type Move, type Room, type RoundScore, type Tile } from "./api";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { colors, seatName, type Board, type Color, type Game, type Move, type Room, type RoundScore } from "./api";
+import { Ceramic } from "./Ceramic";
+import { MatchReviewDialog, HistoryStatus, useMatchHistory } from "./MatchReview";
+import { ScoreHistory } from "./ScoreHistory";
 import "./table.css";
 import { TableIcon } from "./TableActions";
 import "./match-controls.css";
@@ -29,12 +32,6 @@ function TilePatterns() {
       </symbol>
     </defs>
   </svg>;
-}
-
-function Ceramic({ color, ghost = false, preview = false, pending = false }: { color?: Tile; ghost?: boolean; preview?: boolean; pending?: boolean }) {
-  return <span aria-hidden="true" className={`ceramic ${color ?? "blank"}${ghost ? " ghost" : ""}${preview ? " preview" : ""}${pending ? " pending" : ""}`}>
-    {color && <svg focusable="false" viewBox="0 0 32 32"><use href={`#motif-${color}`}/></svg>}
-  </span>;
 }
 
 type Pick = { source: number; color: Color; count: number; revision: number; keyboard: boolean };
@@ -220,8 +217,8 @@ function LastDraft({ move, actor, opponent }: { move: Game["lastMove"]; actor: s
 
 type Rematch = { pending: boolean; onStart: () => void };
 
-function Results({ game, name, yourSeat, busy, rematch }: {
-  game: Game; name: (seat: number) => string; yourSeat: number; busy: boolean; rematch?: Rematch;
+function Results({ game, name, yourSeat, busy, rematch, children }: {
+  game: Game; name: (seat: number) => string; yourSeat: number; busy: boolean; rematch?: Rematch; children: ReactNode;
 }) {
   const tied = game.winners.length === 2;
   const winner = game.winners[0];
@@ -229,6 +226,7 @@ function Results({ game, name, yourSeat, busy, rematch }: {
   return <section className="results" aria-label="Game result">
     <h2>{tied ? "Shared victory" : winner === yourSeat ? "You win!" : `${name(winner)} wins`}</h2>
     {equalPoints && <p>{tied ? "Both players tied on points and completed rows." : "Completed horizontal rows decided the tie."}</p>}
+    {children}
     <table><caption className="sr-only">Scoring breakdown</caption><thead><tr><th scope="col">Points</th>
       {[1,2].map(seat => <th key={seat} scope="col"><span title={name(seat)}>{name(seat)}</span></th>)}</tr></thead>
       <tbody>{(["Wall & floor", "Row bonuses", "Column bonuses", "Color bonuses", "Total"] as const).map((label, index) =>
@@ -245,9 +243,14 @@ function Results({ game, name, yourSeat, busy, rematch }: {
   </section>;
 }
 
-export function GameTable({ room, game, busy, savingMove, networkPaused, draftHints, onMove, rematch }: {
-  room: Room; game: Game; busy: boolean; savingMove: boolean; networkPaused: boolean; draftHints: boolean; onMove: (move: Move & { revision: number }) => void; rematch?: Rematch;
+export function GameTable({ room, game, busy, savingMove, networkPaused, draftHints, onMove, onRefresh, rematch }: {
+  room: Room; game: Game; busy: boolean; savingMove: boolean; networkPaused: boolean; draftHints: boolean; onRefresh: () => void; onMove: (move: Move & { revision: number }) => void; rematch?: Rematch;
 }) {
+  const [review, setReview] = useState<{ matchId: string; revision: number; full: boolean; trigger: HTMLButtonElement } | null>(null);
+  const reviewOpen = !!review && review.matchId === game.matchId;
+  const reader = reviewOpen ? "review" : game.finished ? "results" : "closed";
+  const { history, error, retry } = useMatchHistory(room.id, game.matchId, game.revision, reader, onRefresh);
+  const resultHistory = history?.revision === game.revision ? history : null;
   const [pick, setPick] = useState<Pick | null>(null);
   const table = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -324,6 +327,10 @@ export function GameTable({ room, game, busy, savingMove, networkPaused, draftHi
     onMove({ source: selected.source, color: selected.color, row, revision: selected.revision });
   }
   const seatLabel = (seat: number) => room.seats.find(s => s.number === seat)?.displayName || name(seat);
+  const names: [string, string] = [seatLabel(1), seatLabel(2)];
+  function openReview(trigger: HTMLButtonElement, full: boolean) {
+    if (game.matchId) setReview({ matchId: game.matchId, revision: game.revision, trigger, full });
+  }
   const status = yourTurn ? "Your turn" : `${seatLabel(game.turn)}’s turn`;
   const move = game.lastMove;
   const actor = move && move.seat !== room.yourSeat ? seatLabel(move.seat) : "You";
@@ -360,14 +367,23 @@ export function GameTable({ room, game, busy, savingMove, networkPaused, draftHi
     <div className="game-heading"><h1 ref={heading} tabIndex={-1}>{game.finished ? "Final scores" : `Round ${game.round}`}</h1>
       {!game.finished && <p className="turn" role="status"><i className={game.turn === room.yourSeat ? "active" : ""} /><span title={status}>{status}</span></p>}
     </div>
-    {!game.finished && lastDraft}
+    {!game.finished && <div className="history-recap" data-keep-draft>
+      {lastDraft}
+      {game.matchId && <button type="button" aria-haspopup="dialog" className="text-button history-entry"
+        onClick={event => openReview(event.currentTarget, false)}><TableIcon name="history" />History</button>}
+    </div>}
     <span id="draft-selection" className="sr-only" role="status" aria-live="polite" aria-atomic="true">{selectionStatus}</span>
     <div className={game.finished ? "finished-table" : "match-layout"}>
       {!game.finished && <aside ref={opponent} className="opponent-overview" aria-label="Opponent overview">
         {renderBoard(3 - room.yourSeat, true)}
       </aside>}
       <div className="match-main">
-        {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} busy={locked} rematch={rematch} /> :
+        {game.finished ? <Results game={game} name={name} yourSeat={room.yourSeat} busy={locked} rematch={rematch}>
+          {resultHistory && <ScoreHistory history={resultHistory} names={names} yourSeat={room.yourSeat} />}
+          {game.matchId && <HistoryStatus pending={!resultHistory} error={error} retry={retry} />}
+          {resultHistory && <button type="button" className="open-replay" aria-haspopup="dialog"
+            onClick={event => openReview(event.currentTarget, true)}><TableIcon name="history" />Replay match</button>}
+        </Results> :
           <Supply game={game} active={active} selected={selected} showHint={active && draftHints} markerNote={markerNote} onChange={changeTiles} onPick={(nextPick, button) => {
             sourceButton.current = button;
             setPick(nextPick);
@@ -376,6 +392,10 @@ export function GameTable({ room, game, busy, savingMove, networkPaused, draftHi
         <div className="boards">{(game.finished ? [room.yourSeat, 3 - room.yourSeat] : [room.yourSeat]).map(seat => renderBoard(seat))}</div>
       </div>
     </div>
+    {reviewOpen && <MatchReviewDialog key={review.matchId} full={review.full} trigger={review.trigger} fallback={heading}
+      history={history && (history.revision >= review.revision || error) ? history : null} error={error} retry={retry} names={names} yourSeat={room.yourSeat}
+      returnLabel={game.finished ? "Return to final scores" : yourTurn ? "Return to draft" : "Return to table"}
+      interrupted={networkPaused} onClose={() => setReview(null)} />}
   </div>;
 }
 

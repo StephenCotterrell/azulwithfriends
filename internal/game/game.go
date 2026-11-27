@@ -84,6 +84,12 @@ type View struct {
 	AnticipatedScores [2]int `json:"anticipatedScores"` // Seat order; includes only bonuses on the current wall.
 }
 
+// HistoryEvent captures the public board immediately after one step of play.
+type HistoryEvent struct {
+	Kind  string `json:"kind"`
+	Table Table  `json:"table"`
+}
+
 func New() State {
 	var seed [32]byte
 	rand.Read(seed[:])
@@ -132,20 +138,15 @@ func (s *State) startRound() {
 	}
 }
 
-func (s State) View() View {
+// PublicTable copies the visible board, including its tile lists and recaps.
+func (s *State) PublicTable() Table {
 	t := s.Table
-	// Keep the view independent of later mutations and encode empty offers as [].
 	t.Center = append([]string{}, t.Center...)
 	t.Winners = append([]int{}, t.Winners...)
 	for i, factory := range t.Factories {
 		t.Factories[i] = append([]string{}, factory...)
 	}
-	view := View{LegalMoves: s.legalMoves()}
 	for i, p := range t.Players {
-		view.AnticipatedScores[i] = p.Score
-		if !t.Finished {
-			view.AnticipatedScores[i] += p.wallBonus().total()
-		}
 		t.Players[i].Floor = append([]string{}, p.Floor...)
 	}
 	if t.LastRound != nil {
@@ -156,7 +157,17 @@ func (s State) View() View {
 		last := *t.LastMove
 		t.LastMove = &last
 	}
-	view.Table = t
+	return t
+}
+
+func (s State) View() View {
+	view := View{Table: s.PublicTable(), LegalMoves: s.legalMoves()}
+	for i, p := range s.Players {
+		view.AnticipatedScores[i] = p.Score
+		if !s.Finished {
+			view.AnticipatedScores[i] += p.wallBonus().total()
+		}
+	}
 	return view
 }
 
@@ -201,6 +212,24 @@ func wallColumn(row, color int) int { return (row + color) % len(colors) }
 
 // Apply validates the entire draft before changing any part of the state.
 func (s *State) Apply(seat int, m Move) error {
+	return s.apply(seat, m, nil)
+}
+
+// ApplyRecorded applies a draft and returns each board in chronological order.
+// A round's last draft also records scoring, followed by a refill or final bonuses.
+func (s *State) ApplyRecorded(seat int, m Move) ([]HistoryEvent, error) {
+	var events []HistoryEvent
+	err := s.apply(seat, m, &events)
+	return events, err
+}
+
+func (s *State) record(events *[]HistoryEvent, kind string) {
+	if events != nil {
+		*events = append(*events, HistoryEvent{Kind: kind, Table: s.PublicTable()})
+	}
+}
+
+func (s *State) apply(seat int, m Move, events *[]HistoryEvent) error {
 	if s.Finished {
 		return errors.New("the game has finished")
 	}
@@ -220,8 +249,9 @@ func (s *State) Apply(seat int, m Move) error {
 	}
 
 	s.applyDraft(m)
+	s.record(events, "draft")
 	if s.offersEmpty() {
-		s.finishRound()
+		s.finishRound(events)
 	}
 	return nil
 }

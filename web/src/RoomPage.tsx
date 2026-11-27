@@ -417,7 +417,7 @@ export function RoomPage({ id }: { id: string }) {
       </aside> : <div className="read-error"><p role="alert">{readError}</p><button className="secondary" type="button" onClick={refresh}>Refresh room</button></div>)}
       {room?.game ? <>
         <GameTable room={room} game={room.game} busy={!!pending} savingMove={pending?.name === "moves"} networkPaused={!!readError || checkingMove}
-          draftHints={draftHints} onMove={move => void act({ name: "moves", body: move })}
+          draftHints={draftHints} onRefresh={refresh} onMove={move => void act({ name: "moves", body: move })}
           rematch={finishedBotGame ? {
             pending: pending?.name === "rematch",
             onStart: () => void act({ name: "rematch", body: { revision: finishedBotGame.revision } }),

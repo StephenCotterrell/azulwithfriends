@@ -10,6 +10,22 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func (a *app) getHistory(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validRoomKey(id) {
+		roomError(w, pgx.ErrNoRows)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	history, err := database.GetHistory(ctx, a.db, id, a.sessionHash(r))
+	if err != nil {
+		roomError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, history)
+}
+
 func (a *app) createSoloGame(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		ID string `json:"id"`
