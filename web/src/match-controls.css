@@ -1,14 +1,20 @@
 .table-icon { display: inline-block; flex: none; width: 18px; height: 18px; vertical-align: middle; }
 .playing .room-header .table-more {
+  position: relative; isolation: isolate;
   display: inline-flex; gap: 6px; align-items: center; justify-content: center; min-height: 44px;
-  min-width: 73px; padding: 4px 10px; font-size: .85rem; background: var(--surface);
-  border: 1px solid var(--border-control); border-radius: 7px;
+  min-width: 73px; padding: 5px 11px; font-size: .85rem; background: transparent; border: 0;
+}
+/* Inset the painted button while keeping its full hit area and menu anchor. */
+.table-more::before {
+  content: ""; position: absolute; inset: 4px 0; z-index: -1; pointer-events: none;
+  background: var(--surface); border: 1px solid var(--border-control); border-radius: 7px;
 }
 .playing .room-header a { min-width: 0; flex: 0 1 auto; flex-wrap: wrap; }
 .playing .room-header .table-more, .playing .room-header .theme-toggle { flex: none; }
 .table-more .table-icon { width: 17px; height: 17px; }
-.playing .table-more:hover { background: var(--hover); }
-.playing .table-more:focus-visible, .playing .table-actions button:focus-visible, .playing .retry-now:focus-visible, .playing .change-draft:focus-visible {
+.playing .table-more:hover::before { background: var(--hover); }
+.playing .table-more:focus-visible { outline: none; }
+.playing .table-more:focus-visible::before, .playing .table-actions button:focus-visible, .playing .retry-now:focus-visible, .playing .change-draft:focus-visible {
   outline: 2px solid var(--focus); outline-offset: -2px;
 }
 .table-actions {
