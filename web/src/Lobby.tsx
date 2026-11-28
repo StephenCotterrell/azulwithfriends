@@ -8,10 +8,11 @@ type Props = {
   joinError: string;
   refreshKey: number;
   onJoin: (slug: string) => void;
+  onOpenPublic: () => void;
   onResumeGame: (slug: string | null) => void;
 };
 
-export function Lobby({ entering, disabled, joinError, refreshKey, onJoin, onResumeGame }: Props) {
+export function Lobby({ entering, disabled, joinError, refreshKey, onJoin, onOpenPublic, onResumeGame }: Props) {
   const [rooms, setRooms] = useState<LobbyRoom[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -77,33 +78,33 @@ export function Lobby({ entering, disabled, joinError, refreshKey, onJoin, onRes
 
   return (
     <section className="lobby" aria-labelledby="lobby-title">
-      <div className="lobby-art" aria-hidden="true" />
-      <div className="lobby-inner">
-        <div className="lobby-heading">
-          <h2 id="lobby-title">Public lobby</h2>
-          <button className="text-button" type="button" aria-label="Refresh lobby" onClick={() => setAttempt(value => value + 1)}>Refresh</button>
-        </div>
-        {joinError && <p className="error" role="alert">{joinError}</p>}
-        {loadError && <p className="error" role="status">Couldn’t update the lobby. Refresh to try again.</p>}
-        {rooms === null ? !loadError && <p role="status">Looking for open seats…</p> :
-          rooms.length === 0 ? <div className="lobby-empty">
-            <p>No open rooms right now.</p>
-          </div> :
-          <ul className="lobby-list" aria-label="Open rooms">
-            {rooms.map(({ slug, hostName, isHost }) => {
-              const name = roomName(slug);
-              return <li key={slug}>
-                <div><span className="lobby-room-name">{name}</span>
-                  <span className="lobby-host">{isHost ? "Your room" : `Hosted by ${hostName}`}</span></div>
-                {isHost ? <a className="lobby-return" href={roomPath(slug)} aria-label={`Return to room ${name}`}>Return to room</a> :
-                  <button className="secondary" type="button" aria-label={`Join ${name}`} disabled={disabled} onClick={() => onJoin(slug)}>
-                    {entering === slug ? "Joining…" : "Join"}
-                  </button>}
-              </li>;
-            })}
-          </ul>}
-        {paused && !loadError && <p className="hint" role="status">Live updates paused. Refresh for open seats.</p>}
+      <div className="lobby-heading">
+        <h2 id="lobby-title">Public lobby</h2>
+        <button className="text-button" type="button" aria-label="Refresh lobby" onClick={() => setAttempt(value => value + 1)}>Refresh</button>
       </div>
+      {joinError && <p className="error" role="alert">{joinError}</p>}
+      {loadError && <p className="error" role="status">Couldn’t update the lobby. Refresh to try again.</p>}
+      {rooms === null && !loadError && <p className="lobby-status" role="status">Looking for open seats…</p>}
+      {rooms?.length === 0 && !loadError && <p className="lobby-status">No open games right now.</p>}
+      {rooms && rooms.length > 0 && <ul className="lobby-list" aria-label="Open rooms">
+        {rooms.map(({ slug, hostName, isHost }) => {
+          const name = roomName(slug);
+          return <li key={slug}>
+            <div>
+              <span className="lobby-room-name">{name}</span>
+              <span className="lobby-host">{isHost ? "Your room" : `Hosted by ${hostName}`} · 1 seat open</span>
+            </div>
+            {isHost ? <a className="lobby-return" href={disabled ? undefined : roomPath(slug)} aria-disabled={disabled || undefined} aria-label={`Return to room ${name}`}>Return to room</a> :
+              <button className="secondary" type="button" aria-label={`Join ${name}`} disabled={disabled} onClick={() => onJoin(slug)}>
+                {entering === slug ? "Joining…" : "Join"}
+              </button>}
+          </li>;
+        })}
+      </ul>}
+      <button className="secondary lobby-open" type="button" onClick={onOpenPublic} disabled={disabled}>
+        {entering === "public" ? "Opening game…" : "Open a public game"}
+      </button>
+      {paused && !loadError && <p className="hint" role="status">Live updates paused. Refresh for open seats.</p>}
     </section>
   );
 }

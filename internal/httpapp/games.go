@@ -2,6 +2,7 @@ package httpapp
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -28,13 +29,22 @@ func (a *app) getHistory(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) createSoloGame(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		ID string `json:"id"`
+		ID    string          `json:"id"`
+		Level json.RawMessage `json:"level"`
 	}
 	if !a.readJSON(w, r, &input) {
 		return
 	}
 	if !roomIDPattern.MatchString(input.ID) {
 		problem(w, http.StatusBadRequest, "Send a valid game request ID.")
+		return
+	}
+	var level game.BotLevel
+	if input.Level == nil {
+		// Older clients sent only the request ID and started against Noob.
+		level = game.BotNoob
+	} else if json.Unmarshal(input.Level, &level) != nil || !level.Valid() {
+		problem(w, http.StatusBadRequest, "Choose a valid bot personality.")
 		return
 	}
 	if !a.allowRoomWrite(w) {
@@ -44,7 +54,7 @@ func (a *app) createSoloGame(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	cookie, hash := a.newGuestCookie()
 	session := database.RoomSession{ExistingHash: a.sessionHash(r), NewHash: hash, ExpiresAt: cookie.Expires}
-	room, newSession, err := database.CreateSoloGame(ctx, a.db, input.ID, session)
+	room, newSession, err := database.CreateSoloGame(ctx, a.db, input.ID, level, session)
 	if err != nil {
 		roomError(w, err)
 		return

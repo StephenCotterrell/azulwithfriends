@@ -1,0 +1,16 @@
+.entry-home, .room-page {
+  --ceramic-edge: light-dark(#243b4f70, #b5c6c181);
+  --ceramic-bevel: inset 0 1px 1px #ffffff70, inset 0 -2px 0 #071b2b20;
+}
+
+.tile-patterns { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+.ceramic { position: relative; display: inline-grid; place-items: center; width: var(--tile-size,32px); height: var(--tile-size,32px); flex-shrink: 0; border: 1px solid var(--ceramic-edge); border-radius: 4px; background: var(--glaze); color: var(--motif); box-shadow: var(--ceramic-bevel); }
+.ceramic svg { width: 88%; height: 88%; }
+
+/* Glazes and motifs identify game pieces and stay recognizable in both themes. */
+.ceramic.blue { --glaze: #2475ad; --motif: #d9f2ff; }
+.ceramic.yellow { --glaze: #f5bc42; --motif: #845326; }
+.ceramic.red { --glaze: #b9503b; --motif: #ffe8c9; }
+.ceramic.black { --glaze: #36454a; --motif: #d8e2d7; }
+.ceramic.white { --glaze: #fff9e8; --motif: #427b7c; }
+.ceramic.first { --glaze: #70458d; --motif: #fff4dc; }

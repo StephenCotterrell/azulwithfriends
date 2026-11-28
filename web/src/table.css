@@ -9,7 +9,6 @@
 .close-room-dialog .actions { justify-content: flex-end; margin-top: 20px; }
 .confirm-close { color: var(--on-danger); background: var(--action-danger); }
 .confirm-close:hover { background: var(--action-danger-hover); }
-.tile-patterns { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 .game-heading { display: flex; flex-wrap: wrap; gap: 5px 20px; align-items: center; justify-content: space-between; padding: 19px 0 17px; }
 .game-heading h1 { font-size: clamp(41px, 4.4vw, 64px); letter-spacing: -.055em; line-height: 1.05; margin: 0; }
 .turn { display: inline-flex; max-width: 100%; gap: 9px; align-items: center; overflow-wrap: anywhere; font-size: 1rem; font-weight: 650; margin: 0; }
@@ -23,8 +22,6 @@
 .empty-plate { color: var(--text-muted); font-size: .75rem; }
 .table-center { padding: 6px 0 6px clamp(10px,1.5vw,23px); border-left: 1px solid var(--border); align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
 .center-groups { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-.ceramic { position: relative; display: inline-grid; place-items: center; width: var(--tile-size,32px); height: var(--tile-size,32px); flex-shrink: 0; border: 1px solid var(--ceramic-edge); border-radius: 4px; background: var(--glaze); color: var(--motif); box-shadow: var(--ceramic-bevel); }
-.ceramic svg { width: 88%; height: 88%; }
 .ceramic.blank { background: var(--slot-surface); border-color: var(--slot-edge); border-radius: 3px; box-shadow: inset 0 1px 2px var(--table-shadow); }
 .tile-group { width: calc(var(--tile-size) + 5px); height: calc(var(--tile-size) + 5px); display: inline-grid; align-items: center; justify-items: center; position: relative; border: 0; padding: 0; min-height: 0; border-radius: 5px; color: inherit; background: transparent; }
 .tile-group[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--link); background: var(--surface); }
@@ -123,7 +120,7 @@
   .room-page.playing { width: calc(100% - 16px); padding: 4px 0; }
   .playing .room-header { flex-wrap: nowrap; gap: 6px; padding-bottom: 0; }
   .playing .room-header a { flex: none; font-size: 1.05rem; }
-  .playing .room-header img { width: 24px; height: 24px; margin-right: 2px; }
+  .playing .room-header .ceramic { --tile-size: 24px; margin-right: 2px; }
   .game-heading { flex-wrap: nowrap; gap: 10px; padding: 4px 0; }
   .game-heading h1 { flex: none; font-size: 1.75rem; }
   .turn { min-width: 0; gap: 6px; font-size: .8rem; }
