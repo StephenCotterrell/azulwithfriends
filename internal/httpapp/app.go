@@ -45,6 +45,7 @@ func New(db *pgxpool.Pool, dist string, secureCookies bool) http.Handler {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("POST /api/session", a.saveSession)
+	mux.HandleFunc("POST /api/session/guest", a.ensureGuestSession)
 	mux.HandleFunc("GET /api/me", a.me)
 	mux.HandleFunc("GET /api/lobby", a.lobby)
 	mux.HandleFunc("POST /api/solo-games", a.createSoloGame)
@@ -174,6 +175,28 @@ func (a *app) readJSON(w http.ResponseWriter, r *http.Request, input any) bool {
 	return true
 }
 
+// Establish the guest before starting a solo game. The browser then has the
+// host credential even if the response containing the new room is lost.
+func (a *app) ensureGuestSession(w http.ResponseWriter, r *http.Request) {
+	if !a.readEmptyObject(w, r) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if hash := a.sessionHash(r); hash != nil {
+		player, err := database.FindPlayer(ctx, a.db, hash)
+		if err == nil {
+			writeJSON(w, http.StatusOK, playerResponse{&player})
+			return
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			databaseError(w, err)
+			return
+		}
+	}
+	a.createGuestSession(w, ctx, "")
+}
+
 func (a *app) saveSession(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		DisplayName string `json:"displayName"`
@@ -199,6 +222,10 @@ func (a *app) saveSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	a.createGuestSession(w, ctx, name)
+}
+
+func (a *app) createGuestSession(w http.ResponseWriter, ctx context.Context, name string) {
 	if !a.allowCreation(time.Now()) {
 		w.Header().Set("Retry-After", "60")
 		problem(w, http.StatusTooManyRequests, "Too many guests are joining. Try again in a minute.")

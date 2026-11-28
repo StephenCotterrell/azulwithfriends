@@ -33,7 +33,6 @@
   --on-danger: light-dark(#fff, #371c16);
   --backdrop: light-dark(#152d35a6, #061014bb);
 
-  --art-shade: light-dark(transparent, #0b1e2b73);
 }
 
 :root[data-theme="light"] { color-scheme: light; }

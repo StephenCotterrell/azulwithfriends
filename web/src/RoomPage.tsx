@@ -1,7 +1,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { APIError, botPersonalities, inviteURL, postJSON, requestJSON, roomName, roomPath, seatName, type BotLevel, type Move, type Room } from "./api";
+import { APIError, botPersonalities, colors, inviteURL, postJSON, requestJSON, roomName, roomPath, seatName, type BotLevel, type Move, type Room } from "./api";
+import { Ceramic, TilePatterns } from "./Ceramic";
 import { GuestPanel } from "./GuestPanel";
+import { forgetRecoveredAttempt } from "./soloAttempt";
 import { rememberGame } from "./recentGame";
 import { GameTable, PlayGuide } from "./GameTable";
 import { ThemeToggle } from "./ThemeToggle";
@@ -143,10 +145,10 @@ function Seats({ room, pending, onBot, onStart, onRefresh }: {
 }) {
   return (
     <section className="seats" aria-labelledby="players-heading">
-      <div className="roster-art" aria-hidden="true" />
       <div className="seats-inner">
         <div className="roster-heading">
           <h2 id="players-heading">Players</h2>
+          <span className="roster-tiles" aria-hidden="true">{colors.map(color => <Ceramic key={color} color={color} />)}</span>
           <button className="text-button" onClick={onRefresh} type="button" aria-label="Refresh room">Refresh</button>
         </div>
         <ol aria-label="Players">
@@ -229,6 +231,10 @@ export function RoomPage({ id }: { id: string }) {
   const joinFromInvite = useEffectEvent(() => { void act({ name: "join" }); });
 
   const slug = room?.slug;
+  const ownedSoloId = !embedded && room?.game && room.yourSeat === 1 && room.seats[1]?.isBot ? room.id : null;
+  useEffect(() => {
+    if (ownedSoloId) forgetRecoveredAttempt(ownedSoloId);
+  }, [ownedSoloId]);
   const activeGameSlug = room?.yourSeat && room.game && !room.game.finished ? room.slug : null;
   useEffect(() => {
     if (!activeGameSlug) return;
@@ -392,7 +398,9 @@ export function RoomPage({ id }: { id: string }) {
 
   return (
     <main className={room?.game ? "room-page playing" : "room-page"}>
-      <header className="room-header" data-keep-draft><a href="/" aria-label="Azul with friends home"><img src="/tile.svg" alt="" width="34" height="34" />Azul <em>with friends</em></a>
+      <TilePatterns />
+      <header className="room-header" data-keep-draft>
+        <a href="/" aria-label="Azul with friends home"><Ceramic color="blue" />Azul <em>with friends</em></a>
         <ThemeToggle />
         {room?.game && <button type="button" ref={more} id="table-more" className="secondary table-more" aria-haspopup="dialog"
           aria-expanded={menuOpen} aria-controls={menuOpen ? "table-actions" : undefined}

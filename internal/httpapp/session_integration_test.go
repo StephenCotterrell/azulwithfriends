@@ -74,6 +74,10 @@ func TestGuestPersistsAcrossRestart(t *testing.T) {
 	if err := json.Unmarshal(renamed.Body.Bytes(), &updated); err != nil || renamed.Code != http.StatusOK || updated.Player == nil || updated.Player.ID != guest.Player.ID || updated.Player.DisplayName != "Jay" {
 		t.Fatalf("rename failed to preserve identity: %d %s", renamed.Code, renamed.Body)
 	}
+	ensured := send(http.MethodPost, "/api/session/guest", "{}", cookies[0])
+	if ensured.Code != http.StatusOK || ensured.Body.String() != renamed.Body.String() || len(ensured.Result().Cookies()) != 0 {
+		t.Fatal("ensuring a named guest changed its name or identity")
+	}
 	if _, err := second.Exec(t.Context(), "UPDATE sessions SET expires_at = now() - interval '1 minute'"); err != nil {
 		t.Fatal(err)
 	}

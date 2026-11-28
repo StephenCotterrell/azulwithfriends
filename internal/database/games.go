@@ -32,7 +32,7 @@ const (
 )
 
 // CreateSoloGame commits the guest, both seats and a playable board together.
-func CreateSoloGame(ctx context.Context, pool *pgxpool.Pool, id string, session RoomSession) (Room, bool, error) {
+func CreateSoloGame(ctx context.Context, pool *pgxpool.Pool, id string, level game.BotLevel, session RoomSession) (Room, bool, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return Room{}, false, err
@@ -59,10 +59,10 @@ func CreateSoloGame(ctx context.Context, pool *pgxpool.Pool, id string, session 
 	if err != nil {
 		return Room{}, false, err
 	}
-	if err := insertBotSeat(ctx, tx, id, game.BotNoob); err != nil {
+	if err := insertBotSeat(ctx, tx, id, level); err != nil {
 		return Room{}, false, err
 	}
-	room.Seats = append(room.Seats, seatLabel(2, "", game.BotNoob))
+	room.Seats = append(room.Seats, seatLabel(2, "", level))
 	state := game.New()
 	snapshot := roomSnapshot{room: room, state: &state}
 	started, err := commitGame(ctx, tx, snapshot, true, historyWrite{})

@@ -31,7 +31,7 @@ export function postJSON<T>(path: string, body: object = {}): Promise<T> {
 }
 
 export const botPersonalities = {
-  noob: { name: "Noob", description: "Looks for a pattern line it can fill this turn." },
+  noob: { name: "First-timer", description: "Looks for a pattern line it can fill this turn." },
   beginner: { name: "Beginner", description: "Tries to fit more tiles onto its lines and keep extras off the floor." },
   intermediate: { name: "Intermediate", description: "Chooses the draft that looks best for its own board." },
   competitive: { name: "Competitive", description: "Weighs each draft against your strongest immediate reply." },
